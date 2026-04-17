@@ -25,8 +25,8 @@ jobs:
       - name: Publish Windows (x64, self-contained)
         run: >
           dotnet publish wahlberg.maui/Wahlberg.Maui.csproj
-          -f net10.0-windows10.0.19041.0
-          -r win10-x64
+          -p:TargetFrameworks=net10.0-windows10.0.19041.0
+          -r win-x64
           -c Release
           --self-contained true
           -o publish/windows
