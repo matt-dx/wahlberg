@@ -1,0 +1,57 @@
+# .NET MAUI / .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.swp
+*~
+
+# NuGet
+*.nupkg
+*.snupkg
+project.lock.json
+packages/
+.nuget/
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+
+# Rider / JetBrains
+.idea/
+*.sln.iml
+
+# Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# macOS
+.DS_Store
+*.dylib
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Android / iOS / MAUI
+*.apk
+*.aab
+*.ipa
+*.keystore
+*.jks
+google-services.json
+GoogleService-Info.plist
+
+# Other
+.claude\settings.local.json

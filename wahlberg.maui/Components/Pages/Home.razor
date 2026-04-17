@@ -1,0 +1,205 @@
+@page "/"
+@using CommunityToolkit.Maui.Storage
+@inject TabService TabService
+@inject ThemeService ThemeService
+@inject IJSRuntime JS
+@implements IDisposable
+
+<div class="toolbar">
+    <button class="toolbar-btn" @onclick="OpenFile" title="Open File">
+        <span>📂 Open</span>
+    </button>
+    <div class="toolbar-spacer"></div>
+    <button class="toolbar-btn settings-btn" @onclick="ToggleSettings" title="Settings">
+        <span>⚙</span>
+    </button>
+</div>
+
+<div class="workspace @(TabService.Orientation == TabOrientation.Vertical ? "vertical" : "horizontal")">
+    @if (TabService.OpenDocuments.Count > 0)
+    {
+        <div class="tab-strip">
+            @foreach (var doc in TabService.OpenDocuments)
+            {
+                <div class="tab @(doc == TabService.ActiveDocument ? "active" : "")"
+                     @onclick="() => TabService.SetActiveDocument(doc)">
+                    <span class="tab-title" title="@doc.FilePath">@doc.FileName</span>
+                    <button class="tab-close" @onclick="() => CloseTab(doc)" @onclick:stopPropagation="true" title="Close">✕</button>
+                </div>
+            }
+        </div>
+
+        <div class="content-area">
+            @if (TabService.ActiveDocument is not null)
+            {
+                @if (TabService.ActiveDocument.Headings.Count > 0)
+                {
+                    @if (_tocVisible)
+                    {
+                        <div class="toc-panel">
+                            <div class="toc-header">
+                                <span>Contents</span>
+                                <button class="toc-collapse-btn" @onclick="ToggleToc" title="Collapse">◀</button>
+                            </div>
+                            <nav class="toc-nav">
+                                @foreach (var heading in TabService.ActiveDocument.Headings)
+                                {
+                                    <a class="toc-item toc-level-@heading.Level @(heading.Id == _activeHeadingId ? "active" : "")"
+                                       href="javascript:void(0)"
+                                       @onclick="() => ScrollToHeading(heading.Id)"
+                                       @onclick:preventDefault="true">
+                                        @heading.Text
+                                    </a>
+                                }
+                            </nav>
+                        </div>
+                    }
+                    else
+                    {
+                        <button class="toc-show-btn" @onclick="ToggleToc" title="Show Table of Contents">☰</button>
+                    }
+                }
+
+                <div class="document-content">
+                    <div class="markdown-body">
+                        @((MarkupString)TabService.ActiveDocument.HtmlContent)
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="empty-state">
+            <div class="empty-icon">📄</div>
+            <h2>Markdown Viewer</h2>
+            <p>Open a markdown file to get started</p>
+            <button class="open-btn" @onclick="OpenFile">📂 Open Markdown File</button>
+        </div>
+    }
+</div>
+
+@if (_settingsVisible)
+{
+    <SettingsPanel OnClose="ToggleSettings" />
+}
+
+@code {
+    private bool _tocVisible = true;
+    private bool _settingsVisible;
+    private string _activeHeadingId = "";
+    private DotNetObjectReference<Home>? _dotNetRef;
+    private Guid? _lastRenderedDocId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        TabService.StateChanged += OnStateChanged;
+        ThemeService.ThemeChanged += OnThemeChanged;
+        _dotNetRef = DotNetObjectReference.Create(this);
+        await ThemeService.InitializeAsync();
+        await TabService.RestoreSessionAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("appInterop.applyTheme", ThemeService.ActiveTheme);
+            await JS.InvokeVoidAsync("appInterop.initDropZone", _dotNetRef);
+        }
+
+        if (TabService.ActiveDocument is not null && TabService.ActiveDocument.Id != _lastRenderedDocId)
+        {
+            _lastRenderedDocId = TabService.ActiveDocument.Id;
+            _activeHeadingId = "";
+            await Task.Delay(50);
+            await JS.InvokeVoidAsync("appInterop.processContent", _dotNetRef);
+        }
+    }
+
+    [JSInvokable]
+    public void SetActiveHeading(string headingId)
+    {
+        if (_activeHeadingId != headingId)
+        {
+            _activeHeadingId = headingId;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    [JSInvokable]
+    public void OnFileDropped(string fileName, string content)
+    {
+        // JS fallback — uses filename only (no full path available from browser drop)
+        TabService.AddDocument(fileName, content);
+    }
+
+    private async Task OpenFile()
+    {
+        try
+        {
+            var customFileType = new FilePickerFileType(
+                new Dictionary<DevicePlatform, IEnumerable<string>>
+                {
+                    { DevicePlatform.WinUI, [".md", ".markdown", ".mdown", ".mkd", ".mkdn"] },
+                    { DevicePlatform.macOS, ["md", "markdown"] },
+                    { DevicePlatform.iOS, ["public.text"] },
+                    { DevicePlatform.Android, ["text/markdown", "text/plain"] },
+                });
+
+            var options = new PickOptions
+            {
+                PickerTitle = "Select a Markdown file",
+                FileTypes = customFileType
+            };
+
+            var result = await FilePicker.Default.PickAsync(options);
+            if (result is not null)
+            {
+                var content = await File.ReadAllTextAsync(result.FullPath);
+                TabService.AddDocument(result.FullPath, content);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error opening file: {ex.Message}");
+        }
+    }
+
+    private void CloseTab(MarkdownDocument doc)
+    {
+        TabService.CloseDocument(doc);
+        _lastRenderedDocId = null;
+    }
+
+    private void ToggleToc() => _tocVisible = !_tocVisible;
+
+    private void ToggleSettings() => _settingsVisible = !_settingsVisible;
+
+    private async Task ScrollToHeading(string id)
+    {
+        await JS.InvokeVoidAsync("appInterop.scrollToHeading", id);
+    }
+
+    private void OnStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async void OnThemeChanged()
+    {
+        await InvokeAsync(async () =>
+        {
+            await JS.InvokeVoidAsync("appInterop.applyTheme", ThemeService.ActiveTheme);
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        TabService.StateChanged -= OnStateChanged;
+        ThemeService.ThemeChanged -= OnThemeChanged;
+        _ = JS.InvokeVoidAsync("appInterop.dispose");
+        _dotNetRef?.Dispose();
+    }
+}

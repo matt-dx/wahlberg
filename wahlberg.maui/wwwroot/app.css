@@ -1,0 +1,232 @@
+/* ===== CSS Variables (Theme) ===== */
+:root {
+    --theme-bg: #1e1e1e;
+    --theme-surface: #252526;
+    --theme-text: #d4d4d4;
+    --theme-heading: #e0e0e0;
+    --theme-accent: #0078d4;
+    --theme-border: #333333;
+    --theme-link: #4ea8db;
+    --theme-code-color: #ce9178;
+    --theme-code-bg: #2d2d2d;
+    --theme-pre-bg: #1a1a2e;
+    --theme-table-header-bg: #2d2d2d;
+    --theme-table-row-alt: #1a1a1a;
+    --theme-table-border: #444444;
+    --theme-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --theme-code-font: "Cascadia Code", "Fira Code", Consolas, monospace;
+    --theme-font-size: 15px;
+}
+
+/* ===== Base ===== */
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--theme-font);
+    background: var(--theme-bg);
+    color: var(--theme-text);
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--theme-bg); }
+::-webkit-scrollbar-thumb { background: #424242; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }
+
+#blazor-error-ui {
+    color-scheme: light only;
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}
+.blazor-error-boundary {
+    background: #b32121;
+    padding: 1rem;
+    color: white;
+}
+.blazor-error-boundary::after {
+    content: "An error has occurred."
+}
+
+/* ===== Drag-over visual indicator ===== */
+body.drag-over::after {
+    content: "Drop markdown file here";
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 120, 212, 0.15);
+    border: 3px dashed var(--theme-accent, #0078d4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: var(--theme-accent, #0078d4);
+    z-index: 9999;
+    pointer-events: none;
+}
+
+/* ===== Markdown Body (global, not scoped, so MarkupString content is styled) ===== */
+.markdown-body {
+    padding: 24px 40px;
+    color: var(--theme-text);
+    font-family: var(--theme-font);
+    font-size: var(--theme-font-size);
+    line-height: 1.7;
+}
+
+/* Cap width of prose elements, but let tables use full width */
+.markdown-body > h1, .markdown-body > h2, .markdown-body > h3,
+.markdown-body > h4, .markdown-body > h5, .markdown-body > h6,
+.markdown-body > p, .markdown-body > ul, .markdown-body > ol,
+.markdown-body > blockquote, .markdown-body > pre, .markdown-body > hr,
+.markdown-body > dl, .markdown-body > details {
+    max-width: 960px;
+}
+
+.markdown-body h1, .markdown-body h2, .markdown-body h3,
+.markdown-body h4, .markdown-body h5, .markdown-body h6 {
+    color: var(--theme-heading);
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    font-weight: 600;
+    line-height: 1.3;
+    scroll-margin-top: 8px;
+}
+.markdown-body h1 {
+    font-size: 2em;
+    border-bottom: 1px solid var(--theme-border);
+    padding-bottom: 0.3em;
+}
+.markdown-body h2 {
+    font-size: 1.5em;
+    border-bottom: 1px solid var(--theme-border);
+    padding-bottom: 0.3em;
+}
+.markdown-body h3 { font-size: 1.25em; }
+.markdown-body h4 { font-size: 1.1em; }
+
+.markdown-body p { margin: 0.8em 0; }
+
+.markdown-body a {
+    color: var(--theme-link);
+    text-decoration: none;
+}
+.markdown-body a:hover { text-decoration: underline; }
+
+.markdown-body code {
+    background: var(--theme-code-bg);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: var(--theme-code-font);
+    font-size: 0.9em;
+    color: var(--theme-code-color);
+}
+.markdown-body pre {
+    background: var(--theme-pre-bg);
+    border: 1px solid var(--theme-border);
+    border-radius: 6px;
+    padding: 16px;
+    overflow-x: auto;
+    margin: 1em 0;
+}
+.markdown-body pre code {
+    background: none;
+    padding: 0;
+    color: var(--theme-text);
+    font-size: 14px;
+}
+
+.markdown-body blockquote {
+    border-left: 4px solid var(--theme-accent);
+    margin: 1em 0;
+    padding: 0.5em 1em;
+    background: color-mix(in srgb, var(--theme-surface) 80%, var(--theme-accent));
+    color: color-mix(in srgb, var(--theme-text) 75%, transparent);
+}
+
+.markdown-body ul, .markdown-body ol { padding-left: 2em; margin: 0.8em 0; }
+.markdown-body li { margin: 0.3em 0; }
+
+/* ===== Tables ===== */
+.markdown-body table {
+    border-collapse: collapse;
+    margin: 1em 0;
+    font-size: 0.95em;
+    /* Fill available width so columns spread out and avoid unnecessary wrapping.
+       table-layout:auto lets the browser shrink columns only when the table
+       would otherwise overflow the container. */
+    width: 100%;
+    table-layout: auto;
+}
+.markdown-body thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--theme-table-header-bg);
+    font-weight: 600;
+    color: var(--theme-heading);
+    box-shadow: 0 1px 0 var(--theme-table-border);
+}
+.markdown-body th, .markdown-body td {
+    border: 1px solid var(--theme-table-border);
+    padding: 10px 14px;
+    text-align: left;
+}
+.markdown-body tbody tr:nth-child(odd) {
+    background: var(--theme-bg);
+}
+.markdown-body tbody tr:nth-child(even) {
+    background: var(--theme-table-row-alt);
+}
+.markdown-body tbody tr:hover {
+    background: color-mix(in srgb, var(--theme-accent) 12%, var(--theme-bg));
+}
+
+.markdown-body img {
+    max-width: 100%;
+    border-radius: 4px;
+}
+.markdown-body hr {
+    border: none;
+    border-top: 1px solid var(--theme-border);
+    margin: 2em 0;
+}
+
+/* Task lists */
+.markdown-body .task-list-item {
+    list-style: none;
+    margin-left: -1.5em;
+}
+.markdown-body .task-list-item input[type="checkbox"] {
+    margin-right: 0.5em;
+}
+
+/* ===== Mermaid ===== */
+.markdown-body .mermaid-rendered {
+    text-align: center;
+    margin: 1.5em 0;
+    padding: 16px;
+    background: var(--theme-surface);
+    border: 1px solid var(--theme-border);
+    border-radius: 6px;
+}
+.markdown-body .mermaid-rendered svg {
+    max-width: 100%;
+    height: auto;
+}

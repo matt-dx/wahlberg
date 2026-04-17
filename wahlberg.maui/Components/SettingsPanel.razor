@@ -1,0 +1,249 @@
+@using CommunityToolkit.Maui.Storage
+@inject TabService TabService
+@inject ThemeService ThemeService
+@inject IJSRuntime JS
+
+<div class="settings-overlay" @onclick="Close">
+    <div class="settings-panel" @onclick:stopPropagation="true">
+        <div class="settings-header">
+            <h3>Settings</h3>
+            <button class="settings-close-btn" @onclick="Close">✕</button>
+        </div>
+
+        <div class="settings-body">
+            <!-- Tab Layout -->
+            <section class="settings-section">
+                <h4>Tab Layout</h4>
+                <div class="setting-row">
+                    <label>Orientation</label>
+                    <select @bind="TabService.Orientation" @bind:after="NotifyTabChange">
+                        <option value="@TabOrientation.Horizontal">Horizontal</option>
+                        <option value="@TabOrientation.Vertical">Vertical</option>
+                    </select>
+                </div>
+            </section>
+
+            <!-- Theme Selection -->
+            <section class="settings-section">
+                <h4>Theme</h4>
+                <div class="theme-list">
+                    @foreach (var theme in ThemeService.Themes)
+                    {
+                        <div class="theme-item @(theme.Name == ThemeService.ActiveTheme.Name ? "active" : "")">
+                            <button class="theme-select-btn" @onclick="() => SelectTheme(theme)">
+                                <div class="theme-swatch" style="background: @theme.BackgroundColor; border-color: @theme.AccentColor;">
+                                    <span style="color: @theme.TextColor;">Aa</span>
+                                </div>
+                                <span class="theme-name">@theme.Name</span>
+                            </button>
+                            @if (theme.Name != "default")
+                            {
+                                <button class="theme-delete-btn" @onclick="() => DeleteTheme(theme)" title="Delete">🗑</button>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="theme-actions">
+                    <button class="btn-secondary" @onclick="CreateNewTheme">+ New</button>
+                    <button class="btn-secondary" @onclick="ImportTheme">📥 Import</button>
+                    <button class="btn-secondary" @onclick="ExportTheme">📤 Export</button>
+                </div>
+            </section>
+
+            <!-- Theme Editor -->
+            <section class="settings-section">
+                <h4>Customize: @_editingTheme.Name</h4>
+
+                <div class="setting-row">
+                    <label>Theme Name</label>
+                    <input type="text" @bind="_editingTheme.Name" class="text-input" />
+                </div>
+
+                <div class="color-grid">
+                    <div class="color-field">
+                        <label>Background</label>
+                        <input type="color" @bind="_editingTheme.BackgroundColor" @bind:after="PreviewTheme" />
+                    </div>
+                    <div class="color-field">
+                        <label>Surface</label>
+                        <input type="color" @bind="_editingTheme.SurfaceColor" @bind:after="PreviewTheme" />
+                    </div>
+                    <div class="color-field">
+                        <label>Text</label>
+                        <input type="color" @bind="_editingTheme.TextColor" @bind:after="PreviewTheme" />
+                    </div>
+                    <div class="color-field">
+                        <label>Headings</label>
+                        <input type="color" @bind="_editingTheme.HeadingColor" @bind:after="PreviewTheme" />
+                    </div>
+                    <div class="color-field">
+                        <label>Accent</label>
+                        <input type="color" @bind="_editingTheme.AccentColor" @bind:after="PreviewTheme" />
+                    </div>
+                    <div class="color-field">
+                        <label>Border</label>
+                        <input type="color" @bind="_editingTheme.BorderColor" @bind:after="PreviewTheme" />
+                    </div>
+                    <div class="color-field">
+                        <label>Links</label>
+                        <input type="color" @bind="_editingTheme.LinkColor" @bind:after="PreviewTheme" />
+                    </div>
+                    <div class="color-field">
+                        <label>Code Text</label>
+                        <input type="color" @bind="_editingTheme.CodeColor" @bind:after="PreviewTheme" />
+                    </div>
+                    <div class="color-field">
+                        <label>Code BG</label>
+                        <input type="color" @bind="_editingTheme.CodeBackground" @bind:after="PreviewTheme" />
+                    </div>
+                    <div class="color-field">
+                        <label>Pre BG</label>
+                        <input type="color" @bind="_editingTheme.PreBackground" @bind:after="PreviewTheme" />
+                    </div>
+                    <div class="color-field">
+                        <label>Table Header</label>
+                        <input type="color" @bind="_editingTheme.TableHeaderBackground" @bind:after="PreviewTheme" />
+                    </div>
+                    <div class="color-field">
+                        <label>Table Alt Row</label>
+                        <input type="color" @bind="_editingTheme.TableRowAltBackground" @bind:after="PreviewTheme" />
+                    </div>
+                    <div class="color-field">
+                        <label>Table Border</label>
+                        <input type="color" @bind="_editingTheme.TableBorderColor" @bind:after="PreviewTheme" />
+                    </div>
+                </div>
+
+                <div class="setting-row">
+                    <label>Font Family</label>
+                    <select @bind="_editingTheme.FontFamily" @bind:after="PreviewTheme">
+                        <option value="-apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif">System Default</option>
+                        <option value="&quot;Georgia&quot;, &quot;Times New Roman&quot;, serif">Georgia (Serif)</option>
+                        <option value="&quot;Cascadia Code&quot;, &quot;Fira Code&quot;, Consolas, monospace">Cascadia Code (Mono)</option>
+                        <option value="&quot;Verdana&quot;, &quot;Geneva&quot;, sans-serif">Verdana</option>
+                    </select>
+                </div>
+
+                <div class="setting-row">
+                    <label>Code Font</label>
+                    <select @bind="_editingTheme.CodeFontFamily" @bind:after="PreviewTheme">
+                        <option value="&quot;Cascadia Code&quot;, &quot;Fira Code&quot;, Consolas, monospace">Cascadia Code</option>
+                        <option value="Consolas, &quot;Courier New&quot;, monospace">Consolas</option>
+                        <option value="&quot;JetBrains Mono&quot;, monospace">JetBrains Mono</option>
+                    </select>
+                </div>
+
+                <div class="setting-row">
+                    <label>Font Size: @(_editingTheme.FontSizePx)px</label>
+                    <input type="range" min="10" max="24" @bind="_editingTheme.FontSizePx" @bind:after="PreviewTheme" />
+                </div>
+
+                <button class="btn-primary" @onclick="SaveTheme">💾 Save Theme</button>
+            </section>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private ViewerTheme _editingTheme = new();
+
+    protected override void OnInitialized()
+    {
+        _editingTheme = ThemeService.ActiveTheme.Clone();
+    }
+
+    private async Task SelectTheme(ViewerTheme theme)
+    {
+        await ThemeService.SetActiveThemeAsync(theme);
+        _editingTheme = theme.Clone();
+        await JS.InvokeVoidAsync("appInterop.applyTheme", theme);
+    }
+
+    private async Task DeleteTheme(ViewerTheme theme)
+    {
+        await ThemeService.DeleteThemeAsync(theme);
+        _editingTheme = ThemeService.ActiveTheme.Clone();
+        await JS.InvokeVoidAsync("appInterop.applyTheme", ThemeService.ActiveTheme);
+    }
+
+    private async Task SaveTheme()
+    {
+        await ThemeService.SaveThemeAsync(_editingTheme);
+        var saved = ThemeService.Themes.First(t => t.Name == _editingTheme.Name);
+        await ThemeService.SetActiveThemeAsync(saved);
+        await JS.InvokeVoidAsync("appInterop.applyTheme", saved);
+    }
+
+    private async Task PreviewTheme()
+    {
+        await JS.InvokeVoidAsync("appInterop.applyTheme", _editingTheme);
+    }
+
+    private void CreateNewTheme()
+    {
+        var clone = ThemeService.ActiveTheme.Clone();
+        clone.Name = $"Custom {ThemeService.Themes.Count}";
+        _editingTheme = clone;
+    }
+
+    private async Task ExportTheme()
+    {
+        try
+        {
+            var json = ThemeService.ExportThemeJson(ThemeService.ActiveTheme);
+            var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+            using var stream = new MemoryStream(bytes);
+            await FileSaver.Default.SaveAsync($"{ThemeService.ActiveTheme.Name}.json", stream, default);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Export error: {ex.Message}");
+        }
+    }
+
+    private async Task ImportTheme()
+    {
+        try
+        {
+            var result = await FilePicker.Default.PickAsync(new PickOptions
+            {
+                PickerTitle = "Select a theme file",
+                FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+                {
+                    { DevicePlatform.WinUI, [".json"] },
+                    { DevicePlatform.macOS, ["json"] },
+                    { DevicePlatform.iOS, ["public.json"] },
+                    { DevicePlatform.Android, ["application/json"] },
+                })
+            });
+
+            if (result is not null)
+            {
+                var json = await File.ReadAllTextAsync(result.FullPath);
+                var theme = ThemeService.ImportThemeJson(json);
+                if (theme is not null)
+                {
+                    await ThemeService.SaveThemeAsync(theme);
+                    await ThemeService.SetActiveThemeAsync(theme);
+                    _editingTheme = theme.Clone();
+                    await JS.InvokeVoidAsync("appInterop.applyTheme", theme);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Import error: {ex.Message}");
+        }
+    }
+
+    private void NotifyTabChange() => TabService.NotifyStateChanged();
+
+    private async Task Close()
+    {
+        // Revert to saved active theme in case user was previewing unsaved changes
+        await JS.InvokeVoidAsync("appInterop.applyTheme", ThemeService.ActiveTheme);
+        await OnClose.InvokeAsync();
+    }
+}
