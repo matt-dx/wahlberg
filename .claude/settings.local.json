@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(gh auth *)",
-      "Bash(gh run *)",
-      "Bash(gh api *)"
-    ]
-  }
-}

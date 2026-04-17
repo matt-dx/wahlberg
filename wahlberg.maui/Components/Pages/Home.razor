@@ -2,6 +2,7 @@
 @using CommunityToolkit.Maui.Storage
 @inject TabService TabService
 @inject ThemeService ThemeService
+@inject EditorService EditorService
 @inject IJSRuntime JS
 @implements IDisposable
 
@@ -36,6 +37,7 @@
                 {
                     @if (_tocVisible)
                     {
+                        var (editorIcon, _) = EditorService.GetEditorInfo(EditorService.EditorPath);
                         <div class="toc-panel">
                             <div class="toc-header">
                                 <span>Contents</span>
@@ -52,11 +54,26 @@
                                     </a>
                                 }
                             </nav>
+                            @if (!string.IsNullOrEmpty(EditorService.EditorPath))
+                            {
+                                <button class="toc-edit-full-btn" @onclick="EditCurrentFile" title="Open in editor">
+                                    <i class="@(editorIcon)"></i> Edit
+                                </button>
+                            }
                         </div>
                     }
                     else
                     {
-                        <button class="toc-show-btn" @onclick="ToggleToc" title="Show Table of Contents"><i class="bi bi-list"></i></button>
+                        var (editorIcon, _) = EditorService.GetEditorInfo(EditorService.EditorPath);
+                        <div class="toc-collapsed-panel">
+                            <button class="toc-show-btn" @onclick="ToggleToc" title="Show Table of Contents"><i class="bi bi-list"></i></button>
+                            @if (!string.IsNullOrEmpty(EditorService.EditorPath))
+                            {
+                                <button class="toc-edit-icon-btn" @onclick="EditCurrentFile" title="Open in editor">
+                                    <i class="@(editorIcon)"></i>
+                                </button>
+                            }
+                        </div>
                     }
                 }
 
@@ -95,9 +112,27 @@
     {
         TabService.StateChanged += OnStateChanged;
         ThemeService.ThemeChanged += OnThemeChanged;
+        EditorService.StateChanged += OnStateChanged;
         _dotNetRef = DotNetObjectReference.Create(this);
         await ThemeService.InitializeAsync();
+        await EditorService.InitializeAsync();
         await TabService.RestoreSessionAsync();
+        await OpenFileFromCommandLineAsync();
+    }
+
+    private static readonly string[] _markdownExtensions =
+        [".md", ".markdown", ".mdown", ".mkd", ".mkdn"];
+
+    private async Task OpenFileFromCommandLineAsync()
+    {
+        var args = Environment.GetCommandLineArgs();
+        if (args.Length < 2) return;
+        var filePath = args[1];
+        if (!File.Exists(filePath)) return;
+        if (!_markdownExtensions.Contains(Path.GetExtension(filePath).ToLowerInvariant())) return;
+
+        var content = await File.ReadAllTextAsync(filePath);
+        TabService.AddDocument(filePath, content);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -172,6 +207,12 @@
         _lastRenderedDocId = null;
     }
 
+    private void EditCurrentFile()
+    {
+        if (TabService.ActiveDocument is not null)
+            EditorService.OpenFile(TabService.ActiveDocument.FilePath);
+    }
+
     private void ToggleToc() => _tocVisible = !_tocVisible;
 
     private void ToggleSettings() => _settingsVisible = !_settingsVisible;
@@ -199,6 +240,7 @@
     {
         TabService.StateChanged -= OnStateChanged;
         ThemeService.ThemeChanged -= OnThemeChanged;
+        EditorService.StateChanged -= OnStateChanged;
         _ = JS.InvokeVoidAsync("appInterop.dispose");
         _dotNetRef?.Dispose();
     }

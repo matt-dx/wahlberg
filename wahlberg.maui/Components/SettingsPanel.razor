@@ -1,6 +1,7 @@
 @using CommunityToolkit.Maui.Storage
 @inject TabService TabService
 @inject ThemeService ThemeService
+@inject EditorService EditorService
 @inject IJSRuntime JS
 
 <div class="settings-overlay" @onclick="Close">
@@ -20,6 +21,23 @@
                         <option value="@TabOrientation.Horizontal">Horizontal</option>
                         <option value="@TabOrientation.Vertical">Vertical</option>
                     </select>
+                </div>
+            </section>
+
+            <!-- External Editor -->
+            <section class="settings-section">
+                <h4>External Editor</h4>
+                <div class="editor-row">
+                    @{
+                        var (editorIcon, editorName) = EditorService.GetEditorInfo(EditorService.EditorPath);
+                    }
+                    <i class="@editorIcon editor-icon"></i>
+                    <span class="editor-name">@(string.IsNullOrEmpty(EditorService.EditorPath) ? "Not configured" : editorName)</span>
+                    <button class="btn-secondary" @onclick="PickEditor">Browse</button>
+                    @if (!string.IsNullOrEmpty(EditorService.EditorPath))
+                    {
+                        <button class="btn-secondary" @onclick="ClearEditor">Clear</button>
+                    }
                 </div>
             </section>
 
@@ -237,6 +255,30 @@
             System.Diagnostics.Debug.WriteLine($"Import error: {ex.Message}");
         }
     }
+
+    private async Task PickEditor()
+    {
+        try
+        {
+            var result = await FilePicker.Default.PickAsync(new PickOptions
+            {
+                PickerTitle = "Select editor executable",
+                FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+                {
+                    { DevicePlatform.WinUI, [".exe"] },
+                    { DevicePlatform.macOS, ["app"] },
+                })
+            });
+            if (result is not null)
+                await EditorService.SetEditorPathAsync(result.FullPath);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Editor pick error: {ex.Message}");
+        }
+    }
+
+    private async Task ClearEditor() => await EditorService.ClearEditorAsync();
 
     private void NotifyTabChange() => TabService.NotifyStateChanged();
 

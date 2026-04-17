@@ -1,24 +1,57 @@
 using Microsoft.UI.Xaml;
-
-// To learn more about WinUI, the WinUI project structure,
-// and more about our project templates, see: http://aka.ms/winui-project-info.
+using Microsoft.Win32;
+using System.Runtime.InteropServices;
 
 namespace Wahlberg.WinUI;
 
-/// <summary>
-/// Provides application-specific behavior to supplement the default Application class.
-/// </summary>
 public partial class App : MauiWinUIApplication
 {
-	/// <summary>
-	/// Initializes the singleton application object.  This is the first line of authored code
-	/// executed, and as such is the logical equivalent of main() or WinMain().
-	/// </summary>
-	public App()
-	{
-		this.InitializeComponent();
-	}
+    public App()
+    {
+        this.InitializeComponent();
+    }
 
-	protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();
+    protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();
+
+    protected override void OnLaunched(LaunchActivatedEventArgs args)
+    {
+        RegisterFileAssociations();
+        base.OnLaunched(args);
+    }
+
+    private static void RegisterFileAssociations()
+    {
+        var exePath = Environment.ProcessPath;
+        if (string.IsNullOrEmpty(exePath)) return;
+
+        const string progId = "Wahlberg.MarkdownFile";
+        string[] extensions = [".md", ".markdown", ".mdown", ".mkd", ".mkdn"];
+
+        using (var commandKey = Registry.CurrentUser.CreateSubKey(
+            $@"Software\Classes\{progId}\shell\open\command"))
+        {
+            var existing = commandKey.GetValue("") as string;
+            var desired = $"\"{exePath}\" \"%1\"";
+            if (existing == desired) return; // already registered at this path
+
+            using var progIdKey = Registry.CurrentUser.CreateSubKey(
+                $@"Software\Classes\{progId}");
+            progIdKey.SetValue("", "Markdown File");
+
+            commandKey.SetValue("", desired);
+        }
+
+        foreach (var ext in extensions)
+        {
+            using var extKey = Registry.CurrentUser.CreateSubKey(
+                $@"Software\Classes\{ext}\OpenWithProgids");
+            extKey.SetValue(progId, Array.Empty<byte>(), RegistryValueKind.None);
+        }
+
+        SHChangeNotify(0x08000000, 0x0000, IntPtr.Zero, IntPtr.Zero);
+    }
+
+    [DllImport("shell32.dll")]
+    private static extern void SHChangeNotify(int wEventId, int uFlags,
+        IntPtr dwItem1, IntPtr dwItem2);
 }
-

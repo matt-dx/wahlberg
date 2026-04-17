@@ -264,3 +264,25 @@
     background: rgba(255, 255, 255, 0.05);
     border-color: var(--theme-accent, #0078d4);
 }
+
+/* External Editor row */
+.editor-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.editor-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+    color: var(--theme-text, #ccc);
+}
+
+.editor-name {
+    flex: 1;
+    font-size: 13px;
+    color: var(--theme-text, #ccc);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
