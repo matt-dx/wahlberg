@@ -20,7 +20,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Install MAUI workload
-        run: dotnet workload install maui-windows
+        run: dotnet workload install maui
 
       - name: Publish Windows (x64, self-contained)
         run: >
@@ -31,14 +31,23 @@ jobs:
           --self-contained true
           -o publish/windows
 
-      - name: Zip release artifact
+      - name: Zip Windows artifact
         run: Compress-Archive -Path publish/windows/* -DestinationPath publish/Wahlberg-windows-x64.zip
 
-      - name: Create GitHub Release
+      - name: Publish Android
         run: >
-          gh release create v${{ github.run_number }}
-          publish/Wahlberg-windows-x64.zip
-          --title 'Release #${{ github.run_number }}'
-          --generate-notes
+          dotnet publish wahlberg.maui/Wahlberg.Maui.csproj
+          -f net10.0-android
+          -c Release
+          -o publish/android
+
+      - name: Create GitHub Release
+        shell: bash
+        run: |
+          gh release create "v${{ github.run_number }}" \
+            publish/Wahlberg-windows-x64.zip \
+            publish/android/*.apk \
+            --title 'Release #${{ github.run_number }}' \
+            --generate-notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
