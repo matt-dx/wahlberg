@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'README.md'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install MAUI workload
+        run: dotnet workload install maui-windows
+
+      - name: Publish Windows (x64, self-contained)
+        run: >
+          dotnet publish wahlberg.maui/Wahlberg.Maui.csproj
+          -f net10.0-windows10.0.19041.0
+          -r win10-x64
+          -c Release
+          --self-contained true
+          -o publish/windows
+
+      - name: Zip release artifact
+        run: Compress-Archive -Path publish/windows/* -DestinationPath publish/Wahlberg-windows-x64.zip
+
+      - name: Create GitHub Release
+        run: >
+          gh release create v${{ github.run_number }}
+          publish/Wahlberg-windows-x64.zip
+          --title 'Release #${{ github.run_number }}'
+          --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
