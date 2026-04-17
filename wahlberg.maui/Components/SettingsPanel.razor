@@ -24,22 +24,25 @@
                 </div>
             </section>
 
-            <!-- External Editor -->
-            <section class="settings-section">
-                <h4>External Editor</h4>
-                <div class="editor-row">
-                    @{
-                        var (editorIcon, editorName) = EditorService.GetEditorInfo(EditorService.EditorPath);
-                    }
-                    <i class="@editorIcon editor-icon"></i>
-                    <span class="editor-name">@(string.IsNullOrEmpty(EditorService.EditorPath) ? "Not configured" : editorName)</span>
-                    <button class="btn-secondary" @onclick="PickEditor">Browse</button>
-                    @if (!string.IsNullOrEmpty(EditorService.EditorPath))
-                    {
-                        <button class="btn-secondary" @onclick="ClearEditor">Clear</button>
-                    }
-                </div>
-            </section>
+            @if (IsDesktopPlatform)
+            {
+                <!-- External Editor -->
+                <section class="settings-section">
+                    <h4>External Editor</h4>
+                    <div class="editor-row">
+                        @{
+                            var (editorIcon, editorName) = EditorService.GetEditorInfo(EditorService.EditorPath);
+                        }
+                        <i class="@editorIcon editor-icon"></i>
+                        <span class="editor-name">@(string.IsNullOrEmpty(EditorService.EditorPath) ? "Not configured" : editorName)</span>
+                        <button class="btn-secondary" @onclick="PickEditor">Browse</button>
+                        @if (!string.IsNullOrEmpty(EditorService.EditorPath))
+                        {
+                            <button class="btn-secondary" @onclick="ClearEditor">Clear</button>
+                        }
+                    </div>
+                </section>
+            }
 
             <!-- Theme Selection -->
             <section class="settings-section">
@@ -164,6 +167,10 @@
 
 @code {
     [Parameter] public EventCallback OnClose { get; set; }
+
+    private static bool IsDesktopPlatform =>
+        DeviceInfo.Current.Platform == DevicePlatform.WinUI ||
+        DeviceInfo.Current.Platform == DevicePlatform.MacCatalyst;
 
     private ViewerTheme _editingTheme = new();
 
