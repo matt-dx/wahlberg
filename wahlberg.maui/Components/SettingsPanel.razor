@@ -7,7 +7,7 @@
     <div class="settings-panel" @onclick:stopPropagation="true">
         <div class="settings-header">
             <h3>Settings</h3>
-            <button class="settings-close-btn" @onclick="Close">✕</button>
+            <button class="settings-close-btn" @onclick="Close"><i class="bi bi-x"></i></button>
         </div>
 
         <div class="settings-body">
@@ -38,15 +38,15 @@
                             </button>
                             @if (theme.Name != "default")
                             {
-                                <button class="theme-delete-btn" @onclick="() => DeleteTheme(theme)" title="Delete">🗑</button>
+                                <button class="theme-delete-btn" @onclick="() => DeleteTheme(theme)" title="Delete"><i class="bi bi-trash"></i></button>
                             }
                         </div>
                     }
                 </div>
                 <div class="theme-actions">
                     <button class="btn-secondary" @onclick="CreateNewTheme">+ New</button>
-                    <button class="btn-secondary" @onclick="ImportTheme">📥 Import</button>
-                    <button class="btn-secondary" @onclick="ExportTheme">📤 Export</button>
+                    <button class="btn-secondary" @onclick="ImportTheme"><i class="bi bi-box-arrow-in-down"></i> Import</button>
+                    <button class="btn-secondary" @onclick="ExportTheme"><i class="bi bi-box-arrow-up"></i> Export</button>
                 </div>
             </section>
 
@@ -138,7 +138,7 @@
                     <input type="range" min="10" max="24" @bind="_editingTheme.FontSizePx" @bind:after="PreviewTheme" />
                 </div>
 
-                <button class="btn-primary" @onclick="SaveTheme">💾 Save Theme</button>
+                <button class="btn-primary" @onclick="SaveTheme"><i class="bi bi-floppy"></i> Save Theme</button>
             </section>
         </div>
     </div>
