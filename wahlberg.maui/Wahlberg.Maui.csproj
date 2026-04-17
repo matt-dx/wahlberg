@@ -33,7 +33,7 @@
         <ApplicationTitle>Wahlberg</ApplicationTitle>
 
         <!-- App Identifier -->
-        <ApplicationId>com.companyname.wahlberg</ApplicationId>
+        <ApplicationId>za.co.whitwam.wahlberg</ApplicationId>
 
         <!-- Versions -->
         <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>

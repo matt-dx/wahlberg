@@ -54,4 +54,4 @@ google-services.json
 GoogleService-Info.plist
 
 # Other
-.claude\settings.local.json
+.claude/settings.local.json
