@@ -29,6 +29,14 @@ html, body {
     color: var(--theme-text);
 }
 
+body {
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+    box-sizing: border-box;
+}
+
 *, *::before, *::after {
     box-sizing: border-box;
 }
