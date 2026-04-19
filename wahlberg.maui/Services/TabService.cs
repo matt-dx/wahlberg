@@ -34,7 +34,7 @@ public partial class TabService
                 if (File.Exists(filePath))
                 {
                     var content = await File.ReadAllTextAsync(filePath);
-                    AddDocument(filePath, content, saveSession: false);
+                    await AddDocumentAsync(filePath, content, saveSession: false);
                 }
             }
 
@@ -55,7 +55,7 @@ public partial class TabService
         }
     }
 
-    public void AddDocument(string filePath, string content, bool saveSession = true)
+    public async Task AddDocumentAsync(string filePath, string content, bool saveSession = true)
     {
         var existing = OpenDocuments.FirstOrDefault(d => d.FilePath == filePath);
         if (existing is not null)
@@ -65,22 +65,29 @@ public partial class TabService
             return;
         }
 
-        var html = Markdown.ToHtml(content, _pipeline);
-
-        var docDir = Path.GetDirectoryName(filePath);
-        if (!string.IsNullOrEmpty(docDir))
-            html = ResolveLocalPaths(html, docDir);
-
         var doc = new MarkdownDocument
         {
             FilePath = filePath,
             Content = content,
-            HtmlContent = html,
-            Headings = ExtractHeadings(html)
+            IsLoading = true
         };
 
         OpenDocuments.Add(doc);
         ActiveDocument = doc;
+        StateChanged?.Invoke();
+
+        var (html, headings) = await Task.Run(() =>
+        {
+            var rawHtml = Markdown.ToHtml(content, _pipeline);
+            var docDir = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(docDir))
+                rawHtml = ResolveLocalPaths(rawHtml, docDir);
+            return (rawHtml, ExtractHeadings(rawHtml));
+        });
+
+        doc.HtmlContent = html;
+        doc.Headings = headings;
+        doc.IsLoading = false;
         StateChanged?.Invoke();
 
         if (saveSession)

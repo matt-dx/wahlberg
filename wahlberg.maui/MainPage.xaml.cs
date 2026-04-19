@@ -67,7 +67,7 @@ public partial class MainPage : ContentPage
             if (File.Exists(path))
             {
                 var content = await File.ReadAllTextAsync(path);
-                MainThread.BeginInvokeOnMainThread(() => tabService.AddDocument(path, content));
+                MainThread.BeginInvokeOnMainThread(() => _ = tabService.AddDocumentAsync(path, content));
             }
         }
     }

@@ -8,4 +8,5 @@ public class MarkdownDocument
     public required string Content { get; set; }
     public string HtmlContent { get; set; } = string.Empty;
     public List<HeadingInfo> Headings { get; set; } = [];
+    public bool IsLoading { get; set; } = false;
 }

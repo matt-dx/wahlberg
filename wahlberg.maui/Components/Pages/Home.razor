@@ -77,11 +77,21 @@
                     }
                 }
 
-                <div class="document-content">
-                    <div class="markdown-body">
-                        @((MarkupString)TabService.ActiveDocument.HtmlContent)
+                @if (TabService.ActiveDocument.IsLoading)
+                {
+                    <div class="loading-state">
+                        <div class="loading-spinner"></div>
+                        <p class="loading-label">Loading @TabService.ActiveDocument.FileName…</p>
                     </div>
-                </div>
+                }
+                else
+                {
+                    <div class="document-content">
+                        <div class="markdown-body">
+                            @((MarkupString)TabService.ActiveDocument.HtmlContent)
+                        </div>
+                    </div>
+                }
             }
         </div>
     }
@@ -106,7 +116,7 @@
     private bool _settingsVisible;
     private string _activeHeadingId = "";
     private DotNetObjectReference<Home>? _dotNetRef;
-    private Guid? _lastRenderedDocId;
+    private Guid? _lastProcessedDocId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -132,7 +142,7 @@
         if (!_markdownExtensions.Contains(Path.GetExtension(filePath).ToLowerInvariant())) return;
 
         var content = await File.ReadAllTextAsync(filePath);
-        TabService.AddDocument(filePath, content);
+        await TabService.AddDocumentAsync(filePath, content);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -143,9 +153,10 @@
             await JS.InvokeVoidAsync("appInterop.initDropZone", _dotNetRef);
         }
 
-        if (TabService.ActiveDocument is not null && TabService.ActiveDocument.Id != _lastRenderedDocId)
+        var doc = TabService.ActiveDocument;
+        if (doc is not null && !doc.IsLoading && doc.Id != _lastProcessedDocId)
         {
-            _lastRenderedDocId = TabService.ActiveDocument.Id;
+            _lastProcessedDocId = doc.Id;
             _activeHeadingId = "";
             await Task.Delay(50);
             await JS.InvokeVoidAsync("appInterop.processContent", _dotNetRef);
@@ -166,7 +177,7 @@
     public void OnFileDropped(string fileName, string content)
     {
         // JS fallback — uses filename only (no full path available from browser drop)
-        TabService.AddDocument(fileName, content);
+        _ = TabService.AddDocumentAsync(fileName, content);
     }
 
     private async Task OpenFile()
@@ -192,7 +203,7 @@
             if (result is not null)
             {
                 var content = await File.ReadAllTextAsync(result.FullPath);
-                TabService.AddDocument(result.FullPath, content);
+                await TabService.AddDocumentAsync(result.FullPath, content);
             }
         }
         catch (Exception ex)
@@ -204,7 +215,7 @@
     private void CloseTab(MarkdownDocument doc)
     {
         TabService.CloseDocument(doc);
-        _lastRenderedDocId = null;
+        _lastProcessedDocId = null;
     }
 
     private void EditCurrentFile()
