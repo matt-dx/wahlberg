@@ -32,11 +32,13 @@ jobs:
           -p:UapAppxPackageBuildMode=StoreUpload
           -p:AppxSymbolPackageEnabled=false
 
-      - name: Find MSIX upload package
+      - name: Find MSIX package
         run: |
-          $pkg = Get-ChildItem -Recurse -Filter "*.msixupload" | Select-Object -First 1
-          if (-not $pkg) { Write-Error "No .msixupload file found"; exit 1 }
-          echo "MSIXUPLOAD_PATH=$($pkg.FullName)" >> $env:GITHUB_ENV
+          $pkg = Get-ChildItem -Recurse -Include "*.msixupload","*.msix" |
+            Where-Object { $_.Name -notmatch "_Test" } |
+            Select-Object -First 1
+          if (-not $pkg) { Write-Error "No .msix or .msixupload file found"; exit 1 }
+          echo "MSIX_PATH=$($pkg.FullName)" >> $env:GITHUB_ENV
 
       - name: Publish Android
         run: >
@@ -57,13 +59,13 @@ jobs:
           --clientSecret ${{ secrets.AZURE_CLIENT_SECRET }}
 
       - name: Submit to Microsoft Store
-        run: msstore publish "${{ env.MSIXUPLOAD_PATH }}" --appId 9PN7LZ0ZN93X
+        run: msstore publish wahlberg.maui --appId 9PN7LZ0ZN93X
 
       - name: Create GitHub Release
         shell: bash
         run: |
           gh release create "v${{ github.run_number }}" \
-            "$MSIXUPLOAD_PATH" \
+            "$MSIX_PATH" \
             publish/android/*.apk \
             --title 'Release #${{ github.run_number }}' \
             --generate-notes
