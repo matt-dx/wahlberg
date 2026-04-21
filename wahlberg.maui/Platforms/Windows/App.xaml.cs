@@ -22,8 +22,6 @@ public partial class App : MauiWinUIApplication
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
-        RegisterFileAssociations();
-
         _instanceMutex = new Mutex(true, $"{MutexName}_{Environment.UserName}", out bool isFirstInstance);
 
         if (!isFirstInstance)
@@ -34,6 +32,7 @@ public partial class App : MauiWinUIApplication
             return;
         }
 
+        RegisterFileAssociations();
         _pipeServerCts = new CancellationTokenSource();
         Task.Run(() => ListenForFileRequests(_pipeServerCts.Token));
 
@@ -68,7 +67,7 @@ public partial class App : MauiWinUIApplication
                     $"{PipeName}_{Environment.UserName}",
                     PipeDirection.In, 1,
                     PipeTransmissionMode.Byte,
-                    PipeOptions.Asynchronous);
+                    PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
                 await pipe.WaitForConnectionAsync(ct);
                 using var reader = new StreamReader(pipe);
                 var path = await reader.ReadLineAsync(ct);
@@ -76,7 +75,11 @@ public partial class App : MauiWinUIApplication
                     FileOpenRequest.Raise(path);
             }
             catch (OperationCanceledException) { break; }
-            catch { await Task.Delay(200, ct).ConfigureAwait(false); }
+            catch
+            {
+                try { await Task.Delay(200, ct).ConfigureAwait(false); }
+                catch (OperationCanceledException) { break; }
+            }
         }
     }
 
@@ -84,7 +87,7 @@ public partial class App : MauiWinUIApplication
     {
         _pipeServerCts?.Cancel();
         _pipeServerCts?.Dispose();
-        _instanceMutex?.ReleaseMutex();
+        try { _instanceMutex?.ReleaseMutex(); } catch (ApplicationException) { }
         _instanceMutex?.Dispose();
     }
 

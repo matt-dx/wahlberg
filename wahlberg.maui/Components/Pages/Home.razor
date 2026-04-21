@@ -134,11 +134,12 @@
     private static readonly string[] _markdownExtensions =
         [".md", ".markdown", ".mdown", ".mkd", ".mkdn"];
 
-    private async void OnFileRequestedFromIpc(string filePath)
+    private async Task OnFileRequestedFromIpc(string filePath)
     {
         await InvokeAsync(async () =>
         {
             if (!File.Exists(filePath)) return;
+            if (!_markdownExtensions.Contains(Path.GetExtension(filePath).ToLowerInvariant())) return;
             var content = await File.ReadAllTextAsync(filePath);
             await TabService.AddDocumentAsync(filePath, content);
         });
