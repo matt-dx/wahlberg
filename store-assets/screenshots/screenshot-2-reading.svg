@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1280" height="800" viewBox="0 0 1280 800" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>text { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }</style>
+    <clipPath id="doc-clip">
+      <rect x="240" y="73" width="1040" height="727"/>
+    </clipPath>
+    <clipPath id="toc-clip">
+      <rect x="0" y="73" width="240" height="727"/>
+    </clipPath>
+  </defs>
+
+
+  <!-- Toolbar -->
+  <rect width="1280" height="37" fill="#1e1e1e"/>
+  <line x1="0" y1="37" x2="1280" y2="37" stroke="#333333" stroke-width="1"/>
+  <!-- Open button -->
+  <rect x="8" y="6" width="76" height="25" rx="4" fill="transparent" stroke="transparent"/>
+  <!-- folder icon approx -->
+  <path d="M15,17 L15,13 L19,13 L20,12 L26,12 L26,17 Z" fill="#d4d4d4" opacity="0.8"/>
+  <text x="38" y="23.5" fill="#d4d4d4" font-size="13" dominant-baseline="middle">Open</text>
+  <!-- gear icon -->
+  <circle cx="1260" cy="18.5" r="9" fill="none" stroke="#d4d4d4" stroke-width="1.5" opacity="0.7"/>
+  <circle cx="1260" cy="18.5" r="3.5" fill="#d4d4d4" opacity="0.7"/>
+  <line x1="1260" y1="9.5" x2="1260" y2="12.5" stroke="#d4d4d4" stroke-width="2" opacity="0.7"/>
+  <line x1="1260" y1="24.5" x2="1260" y2="27.5" stroke="#d4d4d4" stroke-width="2" opacity="0.7"/>
+  <line x1="1251" y1="18.5" x2="1254" y2="18.5" stroke="#d4d4d4" stroke-width="2" opacity="0.7"/>
+  <line x1="1266" y1="18.5" x2="1269" y2="18.5" stroke="#d4d4d4" stroke-width="2" opacity="0.7"/>
+  <!-- Window bg -->
+  <rect x="0" y="37" width="1280" height="763" fill="#1e1e1e"/>
+
+  <!-- Tab strip -->
+  <rect x="0" y="37" width="1280" height="36" fill="#252526"/>
+  <line x1="0" y1="73" x2="1280" y2="73" stroke="#333333" stroke-width="1"/>
+  <rect x="0" y="37" width="111.5" height="36" fill="#1e1e1e"/>
+  <line x1="0" y1="72" x2="111.5" y2="72" stroke="#0078d4" stroke-width="2"/>
+  <text x="12" y="59" fill="#e0e0e0" font-size="13">README.md</text>
+  <text x="93.5" y="59" fill="#888888" font-size="14">×</text>
+  <line x1="111.5" y1="43" x2="111.5" y2="67" stroke="#333333" stroke-width="1"/>
+
+  <!-- TOC panel -->
+  <rect x="0" y="73" width="240" height="727" fill="#252526" clip-path="url(#toc-clip)"/>
+  <line x1="240" y1="73" x2="240" y2="800" stroke="#333333" stroke-width="1"/>
+  <!-- TOC header -->
+  <line x1="0" y1="109" x2="240" y2="109" stroke="#333333" stroke-width="1"/>
+  <text x="14" y="95" fill="#e0e0e0" font-size="11" font-weight="600" letter-spacing="0.5">CONTENTS</text>
+  <text x="220" y="95" fill="#888888" font-size="16" text-anchor="middle">‹</text>
+  <rect x="0" y="111" width="240" height="22" fill="rgba(0,120,212,0.08)"/>
+  <line x1="0" y1="111" x2="0" y2="133" stroke="#0078d4" stroke-width="2"/>
+  <text x="14" y="125" fill="#0078d4" font-size="13" font-weight="500">Wahlberg</text>
+  <text x="26" y="151" fill="#888888" font-size="13" >Installation</text>
+  <text x="26" y="177" fill="#888888" font-size="13" >Usage</text>
+  <text x="26" y="203" fill="#888888" font-size="13" >Features</text>
+  <text x="38" y="229" fill="#888888" font-size="13" >Themes</text>
+  <text x="26" y="255" fill="#888888" font-size="13" >Configuration</text>
+  <!-- Document content -->
+  <g clip-path="url(#doc-clip)">
+    <!-- H1 -->
+    <text x="280" y="105" fill="#e0e0e0" font-size="26" font-weight="600">Wahlberg Markdown Viewer</text>
+    <line x1="280" y1="113" x2="1240" y2="113" stroke="#333333" stroke-width="1"/>
+    <!-- Intro paragraph -->
+    <text x="280" y="139" fill="#d4d4d4" font-size="15">A fast, clean Markdown viewer for Windows, Android, iOS and macOS.</text>
+    <text x="280" y="161" fill="#d4d4d4" font-size="15">Supports <tspan fill="#ce9178" font-family=""Cascadia Code", "Fira Code", Consolas, monospace" font-size="14">bold</tspan>, <tspan fill="#4ea8db">links</tspan>, code blocks, tables, and Mermaid diagrams.</text>
+    <!-- H2 Installation -->
+    <text x="280" y="201" fill="#e0e0e0" font-size="20" font-weight="600">Installation</text>
+    <line x1="280" y1="209" x2="540" y2="209" stroke="#333333" stroke-width="1"/>
+    <text x="280" y="231" fill="#d4d4d4" font-size="15">Install from the Microsoft Store or build from source:</text>
+    <!-- Code block -->
+    <rect x="280" y="245" width="960" height="60" rx="6" fill="#1a1a2e" stroke="#333333" stroke-width="1"/>
+    <text x="296" y="268" fill="#d4d4d4" font-family=""Cascadia Code", "Fira Code", Consolas, monospace" font-size="13">dotnet run --project wahlberg.maui \</text>
+    <text x="296" y="288" fill="#d4d4d4" font-family=""Cascadia Code", "Fira Code", Consolas, monospace" font-size="13">    -f net10.0-windows10.0.19041.0</text>
+    <!-- H2 Features -->
+    <text x="280" y="337" fill="#e0e0e0" font-size="20" font-weight="600">Features</text>
+    <line x1="280" y1="345" x2="460" y2="345" stroke="#333333" stroke-width="1"/>
+    <!-- Bullet list -->
+    <circle cx="286" cy="367" r="3" fill="#d4d4d4"/>
+    <text x="298" y="372" fill="#d4d4d4" font-size="15">Tabbed document viewing</text>
+    <circle cx="286" cy="393" r="3" fill="#d4d4d4"/>
+    <text x="298" y="398" fill="#d4d4d4" font-size="15">Automatic table of contents with scroll tracking</text>
+    <circle cx="286" cy="419" r="3" fill="#d4d4d4"/>
+    <text x="298" y="424" fill="#d4d4d4" font-size="15">Customisable themes — create, import and export</text>
+    <circle cx="286" cy="445" r="3" fill="#d4d4d4"/>
+    <text x="298" y="450" fill="#d4d4d4" font-size="15">Local image resolution for relative paths</text>
+    <circle cx="286" cy="471" r="3" fill="#d4d4d4"/>
+    <text x="298" y="476" fill="#d4d4d4" font-size="15">Drag &amp; drop support and session restore</text>
+    <circle cx="286" cy="497" r="3" fill="#d4d4d4"/>
+    <text x="298" y="502" fill="#d4d4d4" font-size="15">Mermaid diagram rendering</text>
+    <!-- H2 Themes preview swatch row -->
+    <text x="280" y="543" fill="#e0e0e0" font-size="20" font-weight="600">Themes</text>
+    <line x1="280" y1="551" x2="420" y2="551" stroke="#333333" stroke-width="1"/>
+    <rect x="280"      y="565" width="60" height="40" rx="4" fill="#1e1e1e" stroke="#0078d4" stroke-width="2"/>
+    <text x="310"  y="590" text-anchor="middle" fill="#d4d4d4" font-size="13">Aa</text>
+    <rect x="350"  y="565" width="60" height="40" rx="4" fill="#ffffff" stroke="#333333" stroke-width="1"/>
+    <text x="380" y="590" text-anchor="middle" fill="#24292e" font-size="13">Aa</text>
+    <rect x="420" y="565" width="60" height="40" rx="4" fill="#0a0a1a" stroke="#6e40c9" stroke-width="1"/>
+    <text x="450" y="590" text-anchor="middle" fill="#e0cfff" font-size="13">Aa</text>
+  </g>
+</svg>

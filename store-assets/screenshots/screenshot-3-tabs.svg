@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1280" height="800" viewBox="0 0 1280 800" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>text { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }</style>
+    <clipPath id="doc-clip">
+      <rect x="240" y="73" width="1040" height="727"/>
+    </clipPath>
+    <clipPath id="toc-clip">
+      <rect x="0" y="73" width="240" height="727"/>
+    </clipPath>
+  </defs>
+
+
+  <!-- Toolbar -->
+  <rect width="1280" height="37" fill="#1e1e1e"/>
+  <line x1="0" y1="37" x2="1280" y2="37" stroke="#333333" stroke-width="1"/>
+  <!-- Open button -->
+  <rect x="8" y="6" width="76" height="25" rx="4" fill="transparent" stroke="transparent"/>
+  <!-- folder icon approx -->
+  <path d="M15,17 L15,13 L19,13 L20,12 L26,12 L26,17 Z" fill="#d4d4d4" opacity="0.8"/>
+  <text x="38" y="23.5" fill="#d4d4d4" font-size="13" dominant-baseline="middle">Open</text>
+  <!-- gear icon -->
+  <circle cx="1260" cy="18.5" r="9" fill="none" stroke="#d4d4d4" stroke-width="1.5" opacity="0.7"/>
+  <circle cx="1260" cy="18.5" r="3.5" fill="#d4d4d4" opacity="0.7"/>
+  <line x1="1260" y1="9.5" x2="1260" y2="12.5" stroke="#d4d4d4" stroke-width="2" opacity="0.7"/>
+  <line x1="1260" y1="24.5" x2="1260" y2="27.5" stroke="#d4d4d4" stroke-width="2" opacity="0.7"/>
+  <line x1="1251" y1="18.5" x2="1254" y2="18.5" stroke="#d4d4d4" stroke-width="2" opacity="0.7"/>
+  <line x1="1266" y1="18.5" x2="1269" y2="18.5" stroke="#d4d4d4" stroke-width="2" opacity="0.7"/>
+  <rect x="0" y="37" width="1280" height="763" fill="#1e1e1e"/>
+
+  <!-- Tab strip -->
+  <rect x="0" y="37" width="1280" height="36" fill="#252526"/>
+  <line x1="0" y1="73" x2="1280" y2="73" stroke="#333333" stroke-width="1"/>
+  <rect x="0" y="37" width="111.5" height="36" fill="#252526"/>
+  
+  <text x="12" y="59" fill="#888888" font-size="13">README.md</text>
+  <text x="93.5" y="59" fill="#888888" font-size="14">×</text>
+  <line x1="111.5" y1="43" x2="111.5" y2="67" stroke="#333333" stroke-width="1"/>
+  <rect x="111.5" y="37" width="134" height="36" fill="#1e1e1e"/>
+  <line x1="111.5" y1="72" x2="245.5" y2="72" stroke="#0078d4" stroke-width="2"/>
+  <text x="123.5" y="59" fill="#e0e0e0" font-size="13">CHANGELOG.md</text>
+  <text x="227.5" y="59" fill="#888888" font-size="14">×</text>
+  <line x1="245.5" y1="43" x2="245.5" y2="67" stroke="#333333" stroke-width="1"/>
+  <rect x="245.5" y="37" width="156.5" height="36" fill="#252526"/>
+  
+  <text x="257.5" y="59" fill="#888888" font-size="13">CONTRIBUTING.md</text>
+  <text x="384" y="59" fill="#888888" font-size="14">×</text>
+  <line x1="402" y1="43" x2="402" y2="67" stroke="#333333" stroke-width="1"/>
+
+  <!-- TOC panel -->
+  <rect x="0" y="73" width="240" height="727" fill="#252526" clip-path="url(#toc-clip)"/>
+  <line x1="240" y1="73" x2="240" y2="800" stroke="#333333" stroke-width="1"/>
+  <!-- TOC header -->
+  <line x1="0" y1="109" x2="240" y2="109" stroke="#333333" stroke-width="1"/>
+  <text x="14" y="95" fill="#e0e0e0" font-size="11" font-weight="600" letter-spacing="0.5">CONTENTS</text>
+  <text x="220" y="95" fill="#888888" font-size="16" text-anchor="middle">‹</text>
+  <text x="14" y="125" fill="#888888" font-size="13" >Changelog</text>
+  <rect x="0" y="137" width="240" height="22" fill="rgba(0,120,212,0.08)"/>
+  <line x1="0" y1="137" x2="0" y2="159" stroke="#0078d4" stroke-width="2"/>
+  <text x="26" y="151" fill="#0078d4" font-size="13" font-weight="500">v1.3.0</text>
+  <text x="38" y="177" fill="#888888" font-size="13" >New Features</text>
+  <text x="38" y="203" fill="#888888" font-size="13" >Bug Fixes</text>
+  <text x="26" y="229" fill="#888888" font-size="13" >v1.2.0</text>
+  <text x="26" y="255" fill="#888888" font-size="13" >v1.1.0</text>
+  <g clip-path="url(#doc-clip)">
+    <!-- H1 Changelog -->
+    <text x="280" y="105" fill="#e0e0e0" font-size="26" font-weight="600">Changelog</text>
+    <line x1="280" y1="113" x2="1240" y2="113" stroke="#333333" stroke-width="1"/>
+    <!-- H2 v1.3.0 -->
+    <text x="280" y="153" fill="#e0e0e0" font-size="20" font-weight="600">v1.3.0</text>
+    <line x1="280" y1="161" x2="420" y2="161" stroke="#333333" stroke-width="1"/>
+    <!-- H3 New Features -->
+    <text x="280" y="189" fill="#e0e0e0" font-size="16" font-weight="600">New Features</text>
+    <circle cx="286"  cy="209" r="3" fill="#d4d4d4"/>
+    <text x="298" y="214" fill="#d4d4d4" font-size="15">Theme import and export — share themes as JSON files</text>
+    <circle cx="286"  cy="235" r="3" fill="#d4d4d4"/>
+    <text x="298" y="240" fill="#d4d4d4" font-size="15">Vertical tab orientation mode for wide documents</text>
+    <circle cx="286"  cy="261" r="3" fill="#d4d4d4"/>
+    <text x="298" y="266" fill="#d4d4d4" font-size="15">External editor integration — open files in VS Code, Notepad++ etc.</text>
+    <circle cx="286"  cy="287" r="3" fill="#d4d4d4"/>
+    <text x="298" y="292" fill="#d4d4d4" font-size="15">Mermaid diagram support via embedded renderer</text>
+    <!-- H3 Bug Fixes -->
+    <text x="280" y="327" fill="#e0e0e0" font-size="16" font-weight="600">Bug Fixes</text>
+    <circle cx="286"  cy="347" r="3" fill="#d4d4d4"/>
+    <text x="298" y="352" fill="#d4d4d4" font-size="15">Fixed image path resolution for UNC network paths</text>
+    <circle cx="286"  cy="373" r="3" fill="#d4d4d4"/>
+    <text x="298" y="378" fill="#d4d4d4" font-size="15">Improved scroll position tracking accuracy in TOC</text>
+    <circle cx="286"  cy="399" r="3" fill="#d4d4d4"/>
+    <text x="298" y="404" fill="#d4d4d4" font-size="15">Session restore now handles deleted files gracefully</text>
+    <!-- H2 v1.2.0 -->
+    <text x="280" y="445" fill="#e0e0e0" font-size="20" font-weight="600">v1.2.0</text>
+    <line x1="280" y1="453" x2="420" y2="453" stroke="#333333" stroke-width="1"/>
+    <circle cx="286"  cy="475" r="3" fill="#d4d4d4"/>
+    <text x="298" y="480" fill="#d4d4d4" font-size="15">Added drag &amp; drop file opening</text>
+    <circle cx="286"  cy="501" r="3" fill="#d4d4d4"/>
+    <text x="298" y="506" fill="#d4d4d4" font-size="15">Session restore on app launch</text>
+    <circle cx="286"  cy="527" r="3" fill="#d4d4d4"/>
+    <text x="298" y="532" fill="#d4d4d4" font-size="15">Task list checkboxes in rendered output</text>
+  </g>
+</svg>
