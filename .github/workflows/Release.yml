@@ -35,10 +35,11 @@ jobs:
       - name: Find MSIX package
         run: |
           $pkg = Get-ChildItem -Recurse -Include "*.msixupload","*.msix" |
-            Where-Object { $_.Name -notmatch "_Test" } |
+            Where-Object { $_.FullName -notmatch "_Test" -and $_.FullName -notmatch "Dependencies" } |
             Select-Object -First 1
           if (-not $pkg) { Write-Error "No .msix or .msixupload file found"; exit 1 }
           echo "MSIX_PATH=$($pkg.FullName)" >> $env:GITHUB_ENV
+          echo "MSIX_DIR=$($pkg.DirectoryName)" >> $env:GITHUB_ENV
 
       - name: Publish Android
         run: >
@@ -59,7 +60,7 @@ jobs:
           --clientSecret ${{ secrets.AZURE_CLIENT_SECRET }}
 
       - name: Submit to Microsoft Store
-        run: msstore publish wahlberg.maui --appId 9PN7LZ0ZN93X
+        run: msstore publish wahlberg.maui --appId 9PN7LZ0ZN93X --inputDirectory "${{ env.MSIX_DIR }}"
 
       - name: Create GitHub Release
         shell: bash
