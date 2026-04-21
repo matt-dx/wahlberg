@@ -30,6 +30,7 @@ jobs:
           -c Release
           -p:AppxPackageSigningEnabled=false
           -p:UapAppxPackageBuildMode=StoreUpload
+          -p:AppxSymbolPackageEnabled=false
 
       - name: Find MSIX upload package
         run: |
