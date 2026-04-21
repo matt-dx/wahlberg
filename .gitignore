@@ -55,3 +55,8 @@ GoogleService-Info.plist
 
 # Other
 .claude/settings.local.json
+store-assets/logos/icon-2160x2160.png
+store-assets/screenshots/screenshot-1-welcome.png
+store-assets/screenshots/screenshot-2-reading.png
+store-assets/screenshots/screenshot-3-tabs.png
+store-assets/screenshots/screenshot-4-settings.png

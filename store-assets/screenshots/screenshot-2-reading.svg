@@ -60,15 +60,15 @@
     <line x1="280" y1="113" x2="1240" y2="113" stroke="#333333" stroke-width="1"/>
     <!-- Intro paragraph -->
     <text x="280" y="139" fill="#d4d4d4" font-size="15">A fast, clean Markdown viewer for Windows, Android, iOS and macOS.</text>
-    <text x="280" y="161" fill="#d4d4d4" font-size="15">Supports <tspan fill="#ce9178" font-family=""Cascadia Code", "Fira Code", Consolas, monospace" font-size="14">bold</tspan>, <tspan fill="#4ea8db">links</tspan>, code blocks, tables, and Mermaid diagrams.</text>
+    <text x="280" y="161" fill="#d4d4d4" font-size="15">Supports <tspan fill="#ce9178" font-family="&quot;Cascadia Code&quot;, &quot;Fira Code&quot;, Consolas, monospace" font-size="14">bold</tspan>, <tspan fill="#4ea8db">links</tspan>, code blocks, tables, and Mermaid diagrams.</text>
     <!-- H2 Installation -->
     <text x="280" y="201" fill="#e0e0e0" font-size="20" font-weight="600">Installation</text>
     <line x1="280" y1="209" x2="540" y2="209" stroke="#333333" stroke-width="1"/>
     <text x="280" y="231" fill="#d4d4d4" font-size="15">Install from the Microsoft Store or build from source:</text>
     <!-- Code block -->
     <rect x="280" y="245" width="960" height="60" rx="6" fill="#1a1a2e" stroke="#333333" stroke-width="1"/>
-    <text x="296" y="268" fill="#d4d4d4" font-family=""Cascadia Code", "Fira Code", Consolas, monospace" font-size="13">dotnet run --project wahlberg.maui \</text>
-    <text x="296" y="288" fill="#d4d4d4" font-family=""Cascadia Code", "Fira Code", Consolas, monospace" font-size="13">    -f net10.0-windows10.0.19041.0</text>
+    <text x="296" y="268" fill="#d4d4d4" font-family="&quot;Cascadia Code&quot;, &quot;Fira Code&quot;, Consolas, monospace" font-size="13">dotnet run --project wahlberg.maui \</text>
+    <text x="296" y="288" fill="#d4d4d4" font-family="&quot;Cascadia Code&quot;, &quot;Fira Code&quot;, Consolas, monospace" font-size="13">    -f net10.0-windows10.0.19041.0</text>
     <!-- H2 Features -->
     <text x="280" y="337" fill="#e0e0e0" font-size="20" font-weight="600">Features</text>
     <line x1="280" y1="345" x2="460" y2="345" stroke="#333333" stroke-width="1"/>
