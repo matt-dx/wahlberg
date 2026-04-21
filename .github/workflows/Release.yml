@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths-ignore:
       - 'README.md'
+      - 'store-assets/**'
 
 permissions:
   contents: write
@@ -22,18 +23,19 @@ jobs:
       - name: Install MAUI workload
         run: dotnet workload install maui
 
-      - name: Publish Windows (x64, self-contained)
+      - name: Publish Windows MSIX (Store upload)
         run: >
           dotnet publish wahlberg.maui/Wahlberg.Maui.csproj
-          -p:TargetFrameworks=net10.0-windows10.0.19041.0
           -f net10.0-windows10.0.19041.0
-          -r win-x64
           -c Release
-          --self-contained true
-          -o publish/windows
+          -p:AppxPackageSigningEnabled=false
+          -p:UapAppxPackageBuildMode=StoreUpload
 
-      - name: Zip Windows artifact
-        run: Compress-Archive -Path publish/windows/* -DestinationPath publish/Wahlberg-windows-x64.zip
+      - name: Find MSIX upload package
+        run: |
+          $pkg = Get-ChildItem -Recurse -Filter "*.msixupload" | Select-Object -First 1
+          if (-not $pkg) { Write-Error "No .msixupload file found"; exit 1 }
+          echo "MSIXUPLOAD_PATH=$($pkg.FullName)" >> $env:GITHUB_ENV
 
       - name: Publish Android
         run: >
@@ -42,11 +44,20 @@ jobs:
           -c Release
           -o publish/android
 
+      - name: Submit to Microsoft Store
+        uses: microsoft/store-publisher@v2
+        with:
+          tenantId: ${{ secrets.AZURE_TENANT_ID }}
+          clientId: ${{ secrets.AZURE_CLIENT_ID }}
+          clientSecret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          productId: 9PN7LZ0ZN93X
+          packagePath: ${{ env.MSIXUPLOAD_PATH }}
+
       - name: Create GitHub Release
         shell: bash
         run: |
           gh release create "v${{ github.run_number }}" \
-            publish/Wahlberg-windows-x64.zip \
+            "$MSIXUPLOAD_PATH" \
             publish/android/*.apk \
             --title 'Release #${{ github.run_number }}' \
             --generate-notes

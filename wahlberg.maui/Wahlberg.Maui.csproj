@@ -33,14 +33,13 @@
         <ApplicationTitle>Wahlberg</ApplicationTitle>
 
         <!-- App Identifier -->
-        <ApplicationId>za.co.whitwam.wahlberg</ApplicationId>
+        <ApplicationId Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'windows'">za.co.whitwam.wahlberg</ApplicationId>
+        <ApplicationId Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">MattWhitwam.Wahlberg</ApplicationId>
+        <ApplicationPublisher Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">CN=285A97EB-1786-4EB8-87B3-CBF3A5260DF7</ApplicationPublisher>
 
         <!-- Versions -->
         <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
         <ApplicationVersion>1</ApplicationVersion>
-
-        <!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
-        <WindowsPackageType>None</WindowsPackageType>
 
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
