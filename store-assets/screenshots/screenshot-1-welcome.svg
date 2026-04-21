@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1280" height="800" viewBox="0 0 1280 800" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>text { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }</style>
+    <clipPath id="doc-clip">
+      <rect x="240" y="73" width="1040" height="727"/>
+    </clipPath>
+    <clipPath id="toc-clip">
+      <rect x="0" y="73" width="240" height="727"/>
+    </clipPath>
+  </defs>
+
+
+  <!-- Toolbar -->
+  <rect width="1280" height="37" fill="#1e1e1e"/>
+  <line x1="0" y1="37" x2="1280" y2="37" stroke="#333333" stroke-width="1"/>
+  <!-- Open button -->
+  <rect x="8" y="6" width="76" height="25" rx="4" fill="transparent" stroke="transparent"/>
+  <!-- folder icon approx -->
+  <path d="M15,17 L15,13 L19,13 L20,12 L26,12 L26,17 Z" fill="#d4d4d4" opacity="0.8"/>
+  <text x="38" y="23.5" fill="#d4d4d4" font-size="13" dominant-baseline="middle">Open</text>
+  <!-- gear icon -->
+  <circle cx="1260" cy="18.5" r="9" fill="none" stroke="#d4d4d4" stroke-width="1.5" opacity="0.7"/>
+  <circle cx="1260" cy="18.5" r="3.5" fill="#d4d4d4" opacity="0.7"/>
+  <line x1="1260" y1="9.5" x2="1260" y2="12.5" stroke="#d4d4d4" stroke-width="2" opacity="0.7"/>
+  <line x1="1260" y1="24.5" x2="1260" y2="27.5" stroke="#d4d4d4" stroke-width="2" opacity="0.7"/>
+  <line x1="1251" y1="18.5" x2="1254" y2="18.5" stroke="#d4d4d4" stroke-width="2" opacity="0.7"/>
+  <line x1="1266" y1="18.5" x2="1269" y2="18.5" stroke="#d4d4d4" stroke-width="2" opacity="0.7"/>
+  <!-- Window background below toolbar -->
+  <rect x="0" y="37" width="1280" height="763" fill="#1e1e1e"/>
+  <!-- File icon (large, centered) -->
+  <g transform="translate(605, 300)">
+    <path d="M0,0 L45,0 L65,22 L65,95 L0,95 Z" fill="none" stroke="#555" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M45,0 L45,22 L65,22" fill="none" stroke="#555" stroke-width="2" stroke-linejoin="round"/>
+    <line x1="12" y1="40" x2="53" y2="40" stroke="#555" stroke-width="2"/>
+    <line x1="12" y1="55" x2="53" y2="55" stroke="#555" stroke-width="2"/>
+    <line x1="12" y1="70" x2="42" y2="70" stroke="#555" stroke-width="2"/>
+  </g>
+  <!-- App name -->
+  <text x="640" y="430" text-anchor="middle" fill="#e0e0e0" font-size="28" font-weight="600">Markdown Viewer</text>
+  <text x="640" y="460" text-anchor="middle" fill="#888888" font-size="15">Open a markdown file to get started</text>
+  <!-- CTA button -->
+  <rect x="540" y="482" width="200" height="42" rx="6" fill="#0078d4"/>
+  <text x="640" y="508" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="500">Open Markdown File</text>
+</svg>

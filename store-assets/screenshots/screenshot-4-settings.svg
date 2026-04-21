@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1280" height="800" viewBox="0 0 1280 800" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>text { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }</style>
+    <clipPath id="doc-clip">
+      <rect x="240" y="73" width="1040" height="727"/>
+    </clipPath>
+    <clipPath id="toc-clip">
+      <rect x="0" y="73" width="240" height="727"/>
+    </clipPath>
+  </defs>
+
+
+  <!-- Toolbar -->
+  <rect width="1280" height="37" fill="#1e1e1e"/>
+  <line x1="0" y1="37" x2="1280" y2="37" stroke="#333333" stroke-width="1"/>
+  <!-- Open button -->
+  <rect x="8" y="6" width="76" height="25" rx="4" fill="transparent" stroke="transparent"/>
+  <!-- folder icon approx -->
+  <path d="M15,17 L15,13 L19,13 L20,12 L26,12 L26,17 Z" fill="#d4d4d4" opacity="0.8"/>
+  <text x="38" y="23.5" fill="#d4d4d4" font-size="13" dominant-baseline="middle">Open</text>
+  <!-- gear icon -->
+  <circle cx="1260" cy="18.5" r="9" fill="none" stroke="#d4d4d4" stroke-width="1.5" opacity="0.7"/>
+  <circle cx="1260" cy="18.5" r="3.5" fill="#d4d4d4" opacity="0.7"/>
+  <line x1="1260" y1="9.5" x2="1260" y2="12.5" stroke="#d4d4d4" stroke-width="2" opacity="0.7"/>
+  <line x1="1260" y1="24.5" x2="1260" y2="27.5" stroke="#d4d4d4" stroke-width="2" opacity="0.7"/>
+  <line x1="1251" y1="18.5" x2="1254" y2="18.5" stroke="#d4d4d4" stroke-width="2" opacity="0.7"/>
+  <line x1="1266" y1="18.5" x2="1269" y2="18.5" stroke="#d4d4d4" stroke-width="2" opacity="0.7"/>
+  <!-- Background app (dimmed) -->
+  <rect x="0" y="37" width="1280" height="763" fill="#1e1e1e"/>
+
+  <!-- Tab strip -->
+  <rect x="0" y="37" width="1280" height="36" fill="#252526"/>
+  <line x1="0" y1="73" x2="1280" y2="73" stroke="#333333" stroke-width="1"/>
+  <rect x="0" y="37" width="111.5" height="36" fill="#1e1e1e"/>
+  <line x1="0" y1="72" x2="111.5" y2="72" stroke="#0078d4" stroke-width="2"/>
+  <text x="12" y="59" fill="#e0e0e0" font-size="13">README.md</text>
+  <text x="93.5" y="59" fill="#888888" font-size="14">×</text>
+  <line x1="111.5" y1="43" x2="111.5" y2="67" stroke="#333333" stroke-width="1"/>
+  <!-- Dimmed TOC background -->
+  <rect x="0" y="73" width="240" height="727" fill="#252526" opacity="0.6"/>
+  <line x1="240" y1="73" x2="240" y2="800" stroke="#333333" stroke-width="1" opacity="0.4"/>
+  <!-- Dimmed document background -->
+  <text x="280" y="105"      fill="#e0e0e0" font-size="26" font-weight="600" opacity="0.25">Wahlberg Markdown Viewer</text>
+  <text x="280" y="139" fill="#d4d4d4"    font-size="15"                  opacity="0.25">A fast, clean Markdown viewer for your documents.</text>
+  <!-- Overlay backdrop -->
+  <rect x="0" y="0" width="1280" height="800" fill="rgba(0,0,0,0.45)"/>
+  <!-- Settings panel -->
+  <rect x="880" y="0" width="400" height="800" fill="#252526" rx="0"/>
+  <line x1="880" y1="0" x2="880" y2="800" stroke="#333333" stroke-width="1"/>
+  <!-- Settings header -->
+  <rect x="880" y="0" width="400" height="52" fill="#252526"/>
+  <line x1="880" y1="52" x2="1280" y2="52" stroke="#333333" stroke-width="1"/>
+  <text x="900" y="33" fill="#e0e0e0" font-size="18" font-weight="600">Settings</text>
+  <text x="1252" y="33" fill="#888888" font-size="22" text-anchor="middle">×</text>
+
+  <!-- Section: Tab Layout -->
+  <text x="900" y="84"  fill="#e0e0e0" font-size="13" font-weight="600">TAB LAYOUT</text>
+  <line x1="900" y1="90" x2="1260" y2="90" stroke="#333333" stroke-width="1"/>
+  <text x="900" y="116" fill="#d4d4d4" font-size="14">Orientation</text>
+  <rect x="1100" y="100" width="150" height="26" rx="4" fill="#1e1e1e" stroke="#333333" stroke-width="1"/>
+  <text x="1115" y="118" fill="#d4d4d4" font-size="13">Horizontal</text>
+  <text x="1250" y="118" fill="#888888" font-size="12" text-anchor="middle">▾</text>
+
+  <!-- Section: Theme -->
+  <text x="900" y="160" fill="#e0e0e0" font-size="13" font-weight="600">THEME</text>
+  <line x1="900" y1="166" x2="1260" y2="166" stroke="#333333" stroke-width="1"/>
+  <!-- Theme items -->
+  <!-- Dark (active) -->
+  <rect x="896" y="174" width="368" height="44" rx="4" fill="rgba(0,120,212,0.1)" stroke="#0078d4" stroke-width="1"/>
+  <rect x="908" y="182" width="36" height="28" rx="3" fill="#1e1e1e" stroke="#0078d4" stroke-width="1.5"/>
+  <text x="926" y="200" text-anchor="middle" fill="#d4d4d4" font-size="12">Aa</text>
+  <text x="954" y="200" fill="#e0e0e0" font-size="14" font-weight="500">dark</text>
+  <!-- Light -->
+  <rect x="896" y="224" width="368" height="44" rx="4" fill="transparent"/>
+  <rect x="908" y="232" width="36" height="28" rx="3" fill="#ffffff" stroke="#333333" stroke-width="1"/>
+  <text x="926" y="250" text-anchor="middle" fill="#24292e" font-size="12">Aa</text>
+  <text x="954" y="250" fill="#d4d4d4" font-size="14">light</text>
+  <!-- Solarized -->
+  <rect x="896" y="274" width="368" height="44" rx="4" fill="transparent"/>
+  <rect x="908" y="282" width="36" height="28" rx="3" fill="#002b36" stroke="#268bd2" stroke-width="1"/>
+  <text x="926" y="300" text-anchor="middle" fill="#839496" font-size="12">Aa</text>
+  <text x="954" y="300" fill="#d4d4d4" font-size="14">solarized</text>
+  <!-- Theme actions -->
+  <rect x="900" y="328" width="60" height="26" rx="4" fill="#1e1e1e" stroke="#333333" stroke-width="1"/>
+  <text x="930" y="345" text-anchor="middle" fill="#d4d4d4" font-size="13">+ New</text>
+  <rect x="968" y="328" width="72" height="26" rx="4" fill="#1e1e1e" stroke="#333333" stroke-width="1"/>
+  <text x="1004" y="345" text-anchor="middle" fill="#d4d4d4" font-size="13">↓ Import</text>
+  <rect x="1048" y="328" width="72" height="26" rx="4" fill="#1e1e1e" stroke="#333333" stroke-width="1"/>
+  <text x="1084" y="345" text-anchor="middle" fill="#d4d4d4" font-size="13">↑ Export</text>
+
+  <!-- Section: Customize -->
+  <text x="900" y="386" fill="#e0e0e0" font-size="13" font-weight="600">CUSTOMIZE: dark</text>
+  <line x1="900" y1="392" x2="1260" y2="392" stroke="#333333" stroke-width="1"/>
+  <!-- Colour grid (3 columns) -->
+  
+  <text x="908" y="414" fill="#888888" font-size="11">Background</text>
+  <rect x="908" y="420" width="36" height="22" rx="3" fill="#1e1e1e" stroke="#333333" stroke-width="1"/>
+  <text x="1032" y="414" fill="#888888" font-size="11">Surface</text>
+  <rect x="1032" y="420" width="36" height="22" rx="3" fill="#252526" stroke="#333333" stroke-width="1"/>
+  <text x="1156" y="414" fill="#888888" font-size="11">Text</text>
+  <rect x="1156" y="420" width="36" height="22" rx="3" fill="#d4d4d4" stroke="#333333" stroke-width="1"/>
+  <text x="908" y="472" fill="#888888" font-size="11">Headings</text>
+  <rect x="908" y="478" width="36" height="22" rx="3" fill="#e0e0e0" stroke="#333333" stroke-width="1"/>
+  <text x="1032" y="472" fill="#888888" font-size="11">Accent</text>
+  <rect x="1032" y="478" width="36" height="22" rx="3" fill="#0078d4" stroke="#333333" stroke-width="1"/>
+  <text x="1156" y="472" fill="#888888" font-size="11">Border</text>
+  <rect x="1156" y="478" width="36" height="22" rx="3" fill="#333333" stroke="#333333" stroke-width="1"/>
+  <text x="908" y="530" fill="#888888" font-size="11">Links</text>
+  <rect x="908" y="536" width="36" height="22" rx="3" fill="#4ea8db" stroke="#333333" stroke-width="1"/>
+  <text x="1032" y="530" fill="#888888" font-size="11">Code Text</text>
+  <rect x="1032" y="536" width="36" height="22" rx="3" fill="#ce9178" stroke="#333333" stroke-width="1"/>
+  <text x="1156" y="530" fill="#888888" font-size="11">Code BG</text>
+  <rect x="1156" y="536" width="36" height="22" rx="3" fill="#2d2d2d" stroke="#333333" stroke-width="1"/>
+  <!-- Font size row -->
+  <text x="900" y="720" fill="#d4d4d4" font-size="14">Font Size: 15px</text>
+  <rect x="900" y="734" width="360" height="6" rx="3" fill="#333333"/>
+  <rect x="900" y="734" width="180" height="6" rx="3" fill="#0078d4"/>
+  <circle cx="1080" cy="737" r="8" fill="#0078d4" stroke="#252526" stroke-width="2"/>
+  <!-- Save button -->
+  <rect x="900" y="754" width="120" height="32" rx="5" fill="#0078d4"/>
+  <text x="960" y="775" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="500">💾 Save Theme</text>
+</svg>
