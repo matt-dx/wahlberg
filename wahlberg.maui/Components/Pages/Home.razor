@@ -128,10 +128,30 @@
         await EditorService.InitializeAsync();
         await TabService.RestoreSessionAsync();
         await OpenFileFromCommandLineAsync();
+        FileOpenRequest.FileRequested += OnFileRequestedFromIpc;
     }
 
     private static readonly string[] _markdownExtensions =
         [".md", ".markdown", ".mdown", ".mkd", ".mkdn"];
+
+    private async Task OnFileRequestedFromIpc(string filePath)
+    {
+        await InvokeAsync(async () =>
+        {
+            if (!File.Exists(filePath)) return;
+            if (!_markdownExtensions.Contains(Path.GetExtension(filePath).ToLowerInvariant())) return;
+            var content = await File.ReadAllTextAsync(filePath);
+            await TabService.AddDocumentAsync(filePath, content);
+        });
+#if WINDOWS
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (Application.Current?.Windows.FirstOrDefault()?.Handler?.PlatformView
+                    is Microsoft.UI.Xaml.Window w)
+                w.Activate();
+        });
+#endif
+    }
 
     private async Task OpenFileFromCommandLineAsync()
     {
@@ -249,6 +269,7 @@
 
     public void Dispose()
     {
+        FileOpenRequest.FileRequested -= OnFileRequestedFromIpc;
         TabService.StateChanged -= OnStateChanged;
         ThemeService.ThemeChanged -= OnThemeChanged;
         EditorService.StateChanged -= OnStateChanged;

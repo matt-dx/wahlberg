@@ -9,6 +9,10 @@ public partial class App : Application
 
 	protected override Window CreateWindow(IActivationState? activationState)
 	{
-		return new Window(new MainPage()) { Title = "Wahlberg" };
+		var window = new Window(new MainPage()) { Title = "Wahlberg" };
+#if WINDOWS
+		window.Destroying += (_, _) => Wahlberg.WinUI.App.Cleanup();
+#endif
+		return window;
 	}
 }
