@@ -1,11 +1,18 @@
+using System.IO.Pipes;
 using Microsoft.UI.Xaml;
 using Microsoft.Win32;
 using System.Runtime.InteropServices;
+using Wahlberg.Services;
 
 namespace Wahlberg.WinUI;
 
 public partial class App : MauiWinUIApplication
 {
+    private static Mutex? _instanceMutex;
+    private static CancellationTokenSource? _pipeServerCts;
+    private const string MutexName = "WahlbergSingleInstance";
+    private const string PipeName = "WahlbergIPC";
+
     public App()
     {
         this.InitializeComponent();
@@ -16,7 +23,69 @@ public partial class App : MauiWinUIApplication
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         RegisterFileAssociations();
+
+        _instanceMutex = new Mutex(true, $"{MutexName}_{Environment.UserName}", out bool isFirstInstance);
+
+        if (!isFirstInstance)
+        {
+            var filePath = GetCommandLineFilePath();
+            if (filePath != null) SendFileToExistingInstance(filePath);
+            Environment.Exit(0);
+            return;
+        }
+
+        _pipeServerCts = new CancellationTokenSource();
+        Task.Run(() => ListenForFileRequests(_pipeServerCts.Token));
+
         base.OnLaunched(args);
+    }
+
+    private static string? GetCommandLineFilePath()
+    {
+        var args = Environment.GetCommandLineArgs();
+        return args.Length >= 2 && File.Exists(args[1]) ? args[1] : null;
+    }
+
+    private static void SendFileToExistingInstance(string filePath)
+    {
+        try
+        {
+            using var pipe = new NamedPipeClientStream(".", $"{PipeName}_{Environment.UserName}", PipeDirection.Out);
+            pipe.Connect(1000);
+            using var writer = new StreamWriter(pipe);
+            writer.WriteLine(filePath);
+        }
+        catch { /* exit silently if pipe unreachable */ }
+    }
+
+    private static async Task ListenForFileRequests(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                using var pipe = new NamedPipeServerStream(
+                    $"{PipeName}_{Environment.UserName}",
+                    PipeDirection.In, 1,
+                    PipeTransmissionMode.Byte,
+                    PipeOptions.Asynchronous);
+                await pipe.WaitForConnectionAsync(ct);
+                using var reader = new StreamReader(pipe);
+                var path = await reader.ReadLineAsync(ct);
+                if (!string.IsNullOrEmpty(path))
+                    FileOpenRequest.Raise(path);
+            }
+            catch (OperationCanceledException) { break; }
+            catch { await Task.Delay(200, ct).ConfigureAwait(false); }
+        }
+    }
+
+    public static void Cleanup()
+    {
+        _pipeServerCts?.Cancel();
+        _pipeServerCts?.Dispose();
+        _instanceMutex?.ReleaseMutex();
+        _instanceMutex?.Dispose();
     }
 
     private static void RegisterFileAssociations()
