@@ -59,6 +59,9 @@ jobs:
           --clientId ${{ secrets.AZURE_CLIENT_ID }}
           --clientSecret ${{ secrets.AZURE_CLIENT_SECRET }}
 
+      - name: List Store apps (debug)
+        run: msstore apps list
+
       - name: Submit to Microsoft Store
         run: msstore publish wahlberg.maui --appId 9PN7LZ0ZN93X --inputDirectory "${{ env.MSIX_DIR }}"
 
