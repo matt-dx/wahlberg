@@ -44,14 +44,19 @@ jobs:
           -c Release
           -o publish/android
 
+      - name: Install MSStore CLI
+        uses: microsoft/microsoft-store-apppublisher@v1.2
+
+      - name: Configure MSStore CLI credentials
+        run: >
+          msstore reconfigure
+          --tenantId ${{ secrets.AZURE_TENANT_ID }}
+          --sellerId ${{ secrets.PARTNER_CENTER_SELLER_ID }}
+          --clientId ${{ secrets.AZURE_CLIENT_ID }}
+          --clientSecret ${{ secrets.AZURE_CLIENT_SECRET }}
+
       - name: Submit to Microsoft Store
-        uses: microsoft/store-publisher@v2
-        with:
-          tenantId: ${{ secrets.AZURE_TENANT_ID }}
-          clientId: ${{ secrets.AZURE_CLIENT_ID }}
-          clientSecret: ${{ secrets.AZURE_CLIENT_SECRET }}
-          productId: 9PN7LZ0ZN93X
-          packagePath: ${{ env.MSIXUPLOAD_PATH }}
+        run: msstore publish "${{ env.MSIXUPLOAD_PATH }}" --appId 9PN7LZ0ZN93X
 
       - name: Create GitHub Release
         shell: bash
