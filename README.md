@@ -14,17 +14,37 @@ A cross-platform Markdown viewer built with .NET MAUI and Blazor.
 ## Supported Platforms
 
 | Platform | Minimum Version |
-|----------|----------------|
-| Windows  | 10.0.17763.0   |
-| Android  | API 24         |
-| iOS      | 15.0           |
-| macOS    | 15.0           |
+|----------|---------------- |
+| Windows  | 10.0.17763.0    |
+| Android  | API 24          |
+| iOS      | 15.0            |
+| macOS    | 15.0            |
 
 ## Tech Stack
 
 - [.NET 10](https://dotnet.microsoft.com/) — MAUI + Blazor Hybrid
 - [Markdig](https://github.com/xoofx/markdig) — Markdown parsing and HTML rendering
 - [CommunityToolkit.Maui](https://github.com/CommunityToolkit/Maui) — file picker and platform helpers
+
+## Installation
+
+### Microsoft Store
+
+Search for **Wahlberg** in the Microsoft Store, or install directly:
+
+[![Get it from Microsoft](https://get.microsoft.com/images/en-us%20dark.svg)](https://www.microsoft.com/store/apps/9PN7LZ0ZNX9X)
+
+### winget
+
+```bash
+winget install MattWhitwam.Wahlberg
+```
+
+or
+
+```bash
+winget install --id 9PN7LZ0ZNX9X -s msstore
+```
 
 ## Getting Started
 
@@ -47,7 +67,7 @@ Or open `Wahlberg.slnx` in Visual Studio and press **F5**.
 
 ## Project Structure
 
-```
+```text
 wahlberg.maui/
 ├── Components/
 │   ├── Layout/          # Shell layout components

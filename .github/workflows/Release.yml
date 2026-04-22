@@ -47,10 +47,10 @@ jobs:
       - name: Create GitHub Release
         shell: bash
         run: |
-          gh release create "v${{ github.run_number }}" \
+          gh release create "v1.${{ github.run_number }}.0" \
             publish/Wahlberg-windows-x64.zip \
             publish/android/*.apk \
-            --title 'Release #${{ github.run_number }}' \
+            --title 'Release v1.${{ github.run_number }}.0' \
             --generate-notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
