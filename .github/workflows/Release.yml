@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths-ignore:
       - 'README.md'
+      - '.gitignore'
       - 'store-assets/**'
       - '.github/workflows/Publish-msix.yml'
 
