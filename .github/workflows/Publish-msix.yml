@@ -2,12 +2,8 @@ name: Publish MSIX to Microsoft Store
 
 on:
   push:
-    branches: [main]
-    paths-ignore:
-      - 'README.md'
-      - '.gitignore'
-      - 'store-assets/**'
-      - '.github/workflows/Release.yml'
+    tags:
+      - 'v*.*.*'
 
 permissions:
   contents: read
@@ -17,6 +13,14 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Extract version from tag
+        id: version
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Publishing version $VERSION"
 
       - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
         with:
@@ -57,6 +61,7 @@ jobs:
           -p:AppxPackageSigningEnabled=false
           -p:UapAppxPackageBuildMode=StoreUpload
           -p:AppxSymbolPackageEnabled=false
+          -p:ApplicationDisplayVersion=${{ steps.version.outputs.version }}
 
       - name: Find MSIX package
         id: find-msix
@@ -69,3 +74,13 @@ jobs:
 
       - name: Submit to Microsoft Store
         run: msstore publish wahlberg.maui --appId 9PN7LZ0ZNX9X --inputDirectory "${{ steps.find-msix.outputs.msix_dir }}" --noCommit
+
+      - name: Submit winget manifest
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
+        run: |
+          wingetcreate update MattWhitwam.Wahlberg `
+            --version ${{ steps.version.outputs.version }} `
+            --urls "https://www.microsoft.com/store/apps/9PN7LZ0ZNX9X" `
+            --token $env:WINGET_TOKEN `
+            --submit

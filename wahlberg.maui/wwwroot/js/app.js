@@ -1,5 +1,6 @@
 window.appInterop = {
     _scrollHandler: null,
+    _linkClickHandler: null,
     _dotNetRef: null,
     _dropDotNetRef: null,
     _lastActiveId: '',
@@ -57,6 +58,7 @@ window.appInterop = {
         });
 
         this._setupScrollTracking();
+        this._setupLinkHandling();
         await this._renderMermaid();
     },
 
@@ -65,6 +67,47 @@ window.appInterop = {
         if (el) {
             el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
+    },
+
+    _setupLinkHandling: function () {
+        const container = document.querySelector('.document-content');
+        if (!container) return;
+
+        if (this._linkClickHandler) {
+            container.removeEventListener('click', this._linkClickHandler);
+        }
+
+        const self = this;
+        this._linkClickHandler = function (e) {
+            const anchor = e.target.closest('a[href]');
+            if (!anchor) return;
+
+            const href = anchor.getAttribute('href');
+            if (!href) return;
+
+            const normalized = href.trim().toLowerCase();
+            if (normalized.startsWith('#')) return;
+
+            // Block dangerous schemes before any navigation
+            if (normalized.startsWith('javascript:') || normalized.startsWith('data:')) {
+                e.preventDefault();
+                return;
+            }
+
+            e.preventDefault();
+            if (!self._dotNetRef) return;
+
+            // Treat anything with a scheme (e.g. http, https, mailto, file, tel) or
+            // protocol-relative URLs as external; bare/relative paths go to OpenRelativeLink
+            const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('//');
+            if (hasScheme) {
+                self._dotNetRef.invokeMethodAsync('OpenExternalUrl', href);
+            } else {
+                self._dotNetRef.invokeMethodAsync('OpenRelativeLink', href);
+            }
+        };
+
+        container.addEventListener('click', this._linkClickHandler);
     },
 
     _setupScrollTracking: function () {
@@ -133,10 +176,12 @@ window.appInterop = {
 
     dispose: function () {
         const container = document.querySelector('.document-content');
-        if (container && this._scrollHandler) {
-            container.removeEventListener('scroll', this._scrollHandler);
+        if (container) {
+            if (this._scrollHandler) container.removeEventListener('scroll', this._scrollHandler);
+            if (this._linkClickHandler) container.removeEventListener('click', this._linkClickHandler);
         }
         this._scrollHandler = null;
+        this._linkClickHandler = null;
         this._dotNetRef = null;
         this._dropDotNetRef = null;
         this._lastActiveId = '';

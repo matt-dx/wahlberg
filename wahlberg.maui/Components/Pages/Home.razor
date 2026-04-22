@@ -98,8 +98,8 @@
     else
     {
         <div class="empty-state">
-            <div class="empty-icon"><i class="bi bi-file-earmark-text"></i></div>
-            <h2>Markdown Viewer</h2>
+            <div class="empty-icon"><i class="bi bi-filetype-md"></i></div>
+            <h2>Wahlberg - Your Simple Markdown Viewer</h2>
             <p>Open a markdown file to get started</p>
             <button class="open-btn" @onclick="OpenFile"><i class="bi bi-folder2-open"></i> Open Markdown File</button>
         </div>
@@ -190,6 +190,45 @@
         {
             _activeHeadingId = headingId;
             InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private static readonly HashSet<string> _allowedExternalSchemes =
+        new(StringComparer.OrdinalIgnoreCase) { "http", "https", "mailto" };
+
+    [JSInvokable]
+    public async Task OpenExternalUrl(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return;
+        if (!_allowedExternalSchemes.Contains(uri.Scheme)) return;
+        try { await Launcher.OpenAsync(uri); }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Error opening URL: {ex.Message}"); }
+    }
+
+    [JSInvokable]
+    public async Task OpenRelativeLink(string href)
+    {
+        var activeDoc = TabService.ActiveDocument;
+        if (activeDoc is null) return;
+
+        var dir = Path.GetDirectoryName(activeDoc.FilePath);
+        if (string.IsNullOrEmpty(dir)) return;
+
+        // Strip fragment and query, then URL-decode before resolving the path
+        var pathPart = href.Split('#', '?')[0];
+        var decoded = Uri.UnescapeDataString(pathPart);
+        var fullPath = Path.GetFullPath(Path.Combine(dir, decoded));
+        if (!File.Exists(fullPath)) return;
+
+        if (_markdownExtensions.Contains(Path.GetExtension(fullPath).ToLowerInvariant()))
+        {
+            var content = await File.ReadAllTextAsync(fullPath);
+            await InvokeAsync(() => TabService.AddDocumentAsync(fullPath, content));
+        }
+        else
+        {
+            try { await Launcher.OpenAsync(new Uri(fullPath)); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Error opening file: {ex.Message}"); }
         }
     }
 
