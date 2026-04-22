@@ -82,24 +82,43 @@ jobs:
         env:
           WINGET_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
         run: |
+          $id      = "MattWhitwam.Wahlberg"
           $version = "${{ steps.version.outputs.version }}"
-          $storeUrl = "https://www.microsoft.com/store/apps/9PN7LZ0ZNX9X"
+          $pkgDir  = "winget-manifest\manifests\m\MattWhitwam\Wahlberg\$version"
+          New-Item -ItemType Directory -Force -Path $pkgDir | Out-Null
 
-          $output = .\wingetcreate.exe update MattWhitwam.Wahlberg `
-            --version $version --urls $storeUrl --token $env:WINGET_TOKEN --submit 2>&1 | Out-String
+          (@(
+            "PackageIdentifier: $id",
+            "PackageVersion: $version",
+            "DefaultLocale: en-US",
+            "ManifestType: version",
+            "ManifestVersion: 1.9.0"
+          ) -join "`n") | Set-Content "$pkgDir\$id.yaml" -Encoding UTF8
 
-          if ($LASTEXITCODE -ne 0) {
-            if ($output -match "was not found") {
-              Write-Host "Package not in winget-pkgs yet — submitting new manifest..."
-              .\wingetcreate.exe new $storeUrl `
-                --id "MattWhitwam.Wahlberg" `
-                --version $version `
-                --name "Wahlberg" `
-                --publisher "Matt Whitwam" `
-                --token $env:WINGET_TOKEN `
-                --submit
-            } else {
-              Write-Error $output
-              exit 1
-            }
-          }
+          (@(
+            "PackageIdentifier: $id",
+            "PackageVersion: $version",
+            "Installers:",
+            "- InstallerType: msstore",
+            "  InstallerUrl: https://www.microsoft.com/store/apps/9PN7LZ0ZNX9X",
+            "ManifestType: installer",
+            "ManifestVersion: 1.9.0"
+          ) -join "`n") | Set-Content "$pkgDir\$id.installer.yaml" -Encoding UTF8
+
+          (@(
+            "PackageIdentifier: $id",
+            "PackageVersion: $version",
+            "PackageLocale: en-US",
+            "Publisher: Matt Whitwam",
+            "PublisherUrl: https://github.com/matt-dx/wahlberg",
+            "PackageName: Wahlberg",
+            "License: Proprietary",
+            "ShortDescription: A cross-platform Markdown viewer built with .NET MAUI and Blazor.",
+            "Tags:",
+            "- markdown",
+            "- viewer",
+            "ManifestType: defaultLocale",
+            "ManifestVersion: 1.9.0"
+          ) -join "`n") | Set-Content "$pkgDir\$id.locale.en-US.yaml" -Encoding UTF8
+
+          .\wingetcreate.exe submit $pkgDir --token $env:WINGET_TOKEN
