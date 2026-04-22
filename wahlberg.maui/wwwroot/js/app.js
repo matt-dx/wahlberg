@@ -83,12 +83,24 @@ window.appInterop = {
             if (!anchor) return;
 
             const href = anchor.getAttribute('href');
-            if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+            if (!href) return;
+
+            const normalized = href.trim().toLowerCase();
+            if (normalized.startsWith('#')) return;
+
+            // Block dangerous schemes before any navigation
+            if (normalized.startsWith('javascript:') || normalized.startsWith('data:')) {
+                e.preventDefault();
+                return;
+            }
 
             e.preventDefault();
             if (!self._dotNetRef) return;
 
-            if (/^https?:\/\//i.test(href) || /^mailto:/i.test(href)) {
+            // Treat anything with a scheme (e.g. http, https, mailto, file, tel) or
+            // protocol-relative URLs as external; bare/relative paths go to OpenRelativeLink
+            const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('//');
+            if (hasScheme) {
                 self._dotNetRef.invokeMethodAsync('OpenExternalUrl', href);
             } else {
                 self._dotNetRef.invokeMethodAsync('OpenRelativeLink', href);
