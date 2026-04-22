@@ -23,23 +23,17 @@ jobs:
       - name: Install MAUI workload
         run: dotnet workload install maui
 
-      - name: Publish Windows MSIX (Store upload)
+      - name: Publish Windows (self-contained exe)
         run: >
           dotnet publish wahlberg.maui/Wahlberg.Maui.csproj
           -f net10.0-windows10.0.19041.0
           -c Release
-          -p:AppxPackageSigningEnabled=false
-          -p:UapAppxPackageBuildMode=StoreUpload
-          -p:AppxSymbolPackageEnabled=false
+          -p:WindowsPackageType=None
+          -p:SelfContained=true
+          -o publish/windows
 
-      - name: Find MSIX package
-        run: |
-          $pkg = Get-ChildItem -Recurse -Include "*.msixupload","*.msix" |
-            Where-Object { $_.FullName -notmatch "_Test" -and $_.FullName -notmatch "Dependencies" } |
-            Select-Object -First 1
-          if (-not $pkg) { Write-Error "No .msix or .msixupload file found"; exit 1 }
-          echo "MSIX_PATH=$($pkg.FullName)" >> $env:GITHUB_ENV
-          echo "MSIX_DIR=$($pkg.DirectoryName)" >> $env:GITHUB_ENV
+      - name: Zip Windows output
+        run: Compress-Archive -Path publish/windows/* -DestinationPath publish/Wahlberg-windows-x64.zip
 
       - name: Publish Android
         run: >
@@ -48,25 +42,11 @@ jobs:
           -c Release
           -o publish/android
 
-      - name: Install MSStore CLI
-        uses: microsoft/microsoft-store-apppublisher@v1.2
-
-      - name: Configure MSStore CLI credentials
-        run: >
-          msstore reconfigure
-          --tenantId ${{ secrets.AZURE_TENANT_ID }}
-          --sellerId ${{ secrets.PARTNER_CENTER_SELLER_ID }}
-          --clientId ${{ secrets.AZURE_CLIENT_ID }}
-          --clientSecret ${{ secrets.AZURE_CLIENT_SECRET }}
-
-      - name: Submit to Microsoft Store
-        run: msstore publish wahlberg.maui --appId 9PN7LZ0ZNX9X --inputDirectory "${{ env.MSIX_DIR }}" --noCommit
-
       - name: Create GitHub Release
         shell: bash
         run: |
           gh release create "v${{ github.run_number }}" \
-            "$MSIX_PATH" \
+            publish/Wahlberg-windows-x64.zip \
             publish/android/*.apk \
             --title 'Release #${{ github.run_number }}' \
             --generate-notes
