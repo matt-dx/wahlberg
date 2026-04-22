@@ -34,11 +34,15 @@ jobs:
 
       - name: Check for pending submission
         run: |
-          $result = msstore submission status 9PN7LZ0ZNX9X | ConvertFrom-Json
-          $blocking = @('PendingCommit','CommitStarted','PendingPublication','Publishing','PreProcessing','Certification','Release')
-          if ($blocking -contains $result.status) {
-            Write-Error "A submission is already in progress (status: $($result.status)). Wait for it to complete or cancel it in Partner Center before pushing again."
-            exit 1
+          $output = msstore submission status 9PN7LZ0ZNX9X 2>&1 | Out-String
+          $clean = $output -replace '\x1b\[[\d;]*[mGKHF]', ''
+          if ($clean -match 'Submission Status\s*=\s*(\S+)') {
+            $status = $Matches[1].Trim()
+            $blocking = @('PendingCommit','CommitStarted','PendingPublication','Publishing','PreProcessing','Certification','Release')
+            if ($blocking -contains $status) {
+              Write-Error "A submission is already in progress (status: $status). Wait for it to complete or cancel it in Partner Center before pushing again."
+              exit 1
+            }
           }
 
       - name: Install MAUI workload
