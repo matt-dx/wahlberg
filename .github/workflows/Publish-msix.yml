@@ -75,11 +75,14 @@ jobs:
       - name: Submit to Microsoft Store
         run: msstore publish wahlberg.maui --appId 9PN7LZ0ZNX9X --inputDirectory "${{ steps.find-msix.outputs.msix_dir }}" --noCommit
 
+      - name: Install wingetcreate
+        run: iwr https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+
       - name: Submit winget manifest
         env:
           WINGET_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
         run: |
-          wingetcreate update MattWhitwam.Wahlberg `
+          .\wingetcreate.exe update MattWhitwam.Wahlberg `
             --version ${{ steps.version.outputs.version }} `
             --urls "https://www.microsoft.com/store/apps/9PN7LZ0ZNX9X" `
             --token $env:WINGET_TOKEN `
