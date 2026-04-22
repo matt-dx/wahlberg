@@ -35,7 +35,7 @@
         <!-- App Identifier -->
         <ApplicationId Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'windows'">za.co.whitwam.wahlberg</ApplicationId>
         <ApplicationId Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">MattWhitwam.Wahlberg</ApplicationId>
-        <ApplicationPublisher Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">CN=285A97EB-1786-4EB8-B7B3-CBF3A5260DF7</ApplicationPublisher>
+        <ApplicationPublisher Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">CN=285A97EB-1786-4EB8-87B3-CBF3A5260DF7</ApplicationPublisher>
 
         <!-- Versions -->
         <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
