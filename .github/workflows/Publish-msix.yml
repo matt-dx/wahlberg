@@ -6,6 +6,7 @@ on:
     paths-ignore:
       - 'README.md'
       - 'store-assets/**'
+      - '.github/workflows/Release.yml'
 
 permissions:
   contents: read

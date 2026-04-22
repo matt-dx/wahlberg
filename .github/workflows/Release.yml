@@ -6,6 +6,7 @@ on:
     paths-ignore:
       - 'README.md'
       - 'store-assets/**'
+      - '.github/workflows/Publish-msix.yml'
 
 permissions:
   contents: write
