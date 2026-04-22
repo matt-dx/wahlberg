@@ -7,7 +7,7 @@ on:
       - 'README.md'
       - '.gitignore'
       - 'store-assets/**'
-      - '.github/workflows/Publish-msix.yml'
+      #- '.github/workflows/Publish-msix.yml'
 
 permissions:
   contents: write
