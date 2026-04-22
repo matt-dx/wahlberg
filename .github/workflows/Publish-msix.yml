@@ -20,6 +20,26 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Install MSStore CLI
+        uses: microsoft/microsoft-store-apppublisher@v1.2
+
+      - name: Configure MSStore CLI credentials
+        run: >
+          msstore reconfigure
+          --tenantId ${{ secrets.AZURE_TENANT_ID }}
+          --sellerId ${{ secrets.PARTNER_CENTER_SELLER_ID }}
+          --clientId ${{ secrets.AZURE_CLIENT_ID }}
+          --clientSecret ${{ secrets.AZURE_CLIENT_SECRET }}
+
+      - name: Check for pending submission
+        run: |
+          $result = msstore submission status 9PN7LZ0ZNX9X | ConvertFrom-Json
+          $blocking = @('PendingCommit','CommitStarted','PendingPublication','Publishing','PreProcessing','Certification','Release')
+          if ($blocking -contains $result.status) {
+            Write-Error "A submission is already in progress (status: $($result.status)). Wait for it to complete or cancel it in Partner Center before pushing again."
+            exit 1
+          }
+
       - name: Install MAUI workload
         run: dotnet workload install maui
 
@@ -40,17 +60,6 @@ jobs:
             Select-Object -First 1
           if (-not $pkg) { Write-Error "No .msix or .msixupload file found"; exit 1 }
           echo "msix_dir=$($pkg.DirectoryName)" >> $env:GITHUB_OUTPUT
-
-      - name: Install MSStore CLI
-        uses: microsoft/microsoft-store-apppublisher@v1.2
-
-      - name: Configure MSStore CLI credentials
-        run: >
-          msstore reconfigure
-          --tenantId ${{ secrets.AZURE_TENANT_ID }}
-          --sellerId ${{ secrets.PARTNER_CENTER_SELLER_ID }}
-          --clientId ${{ secrets.AZURE_CLIENT_ID }}
-          --clientSecret ${{ secrets.AZURE_CLIENT_SECRET }}
 
       - name: Submit to Microsoft Store
         run: msstore publish wahlberg.maui --appId 9PN7LZ0ZNX9X --inputDirectory "${{ steps.find-msix.outputs.msix_dir }}" --noCommit
