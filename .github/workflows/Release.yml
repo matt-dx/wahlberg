@@ -53,4 +53,4 @@ jobs:
             --title 'Release v1.${{ github.run_number }}.0' \
             --generate-notes
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
