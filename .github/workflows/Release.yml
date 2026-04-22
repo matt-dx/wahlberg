@@ -60,7 +60,11 @@ jobs:
           --clientSecret ${{ secrets.AZURE_CLIENT_SECRET }}
 
       - name: Submit to Microsoft Store
+<<<<<<< agents/microsoft-store-upload-github-actions
+        run: msstore publish wahlberg.maui --appId 9PN7LZ0ZNX9X --inputDirectory "${{ env.MSIX_DIR }}" --noCommit
+=======
         run: msstore publish wahlberg.maui --appId 9PN7LZ0ZNX9X --inputDirectory "${{ env.MSIX_DIR }}"
+>>>>>>> main
 
       - name: Create GitHub Release
         shell: bash
