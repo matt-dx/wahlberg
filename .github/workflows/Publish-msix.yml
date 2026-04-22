@@ -82,8 +82,24 @@ jobs:
         env:
           WINGET_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
         run: |
-          .\wingetcreate.exe update MattWhitwam.Wahlberg `
-            --version ${{ steps.version.outputs.version }} `
-            --urls "https://www.microsoft.com/store/apps/9PN7LZ0ZNX9X" `
-            --token $env:WINGET_TOKEN `
-            --submit
+          $version = "${{ steps.version.outputs.version }}"
+          $storeUrl = "https://www.microsoft.com/store/apps/9PN7LZ0ZNX9X"
+
+          $output = .\wingetcreate.exe update MattWhitwam.Wahlberg `
+            --version $version --urls $storeUrl --token $env:WINGET_TOKEN --submit 2>&1 | Out-String
+
+          if ($LASTEXITCODE -ne 0) {
+            if ($output -match "was not found") {
+              Write-Host "Package not in winget-pkgs yet — submitting new manifest..."
+              .\wingetcreate.exe new $storeUrl `
+                --id "MattWhitwam.Wahlberg" `
+                --version $version `
+                --name "Wahlberg" `
+                --publisher "Matt Whitwam" `
+                --token $env:WINGET_TOKEN `
+                --submit
+            } else {
+              Write-Error $output
+              exit 1
+            }
+          }
