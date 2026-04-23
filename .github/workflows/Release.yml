@@ -25,6 +25,14 @@ jobs:
       - name: Install MAUI workload
         run: dotnet workload install maui
 
+      - name: Set version in csproj
+        run: |
+          $version = "1.${{ github.run_number }}.0"
+          $csproj  = "wahlberg.maui/Wahlberg.Maui.csproj"
+          $xml     = [xml](Get-Content $csproj)
+          $xml.SelectSingleNode("//ApplicationDisplayVersion").InnerText = $version
+          $xml.Save((Resolve-Path $csproj))
+
       - name: Publish Windows (self-contained exe)
         run: >
           dotnet publish wahlberg.maui/Wahlberg.Maui.csproj
