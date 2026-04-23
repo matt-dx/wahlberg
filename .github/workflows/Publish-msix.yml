@@ -75,16 +75,24 @@ jobs:
       - name: Submit to Microsoft Store
         run: msstore publish wahlberg.maui --appId 9PN7LZ0ZNX9X --inputDirectory "${{ steps.find-msix.outputs.msix_dir }}"
 
-      - name: Install wingetcreate
-        run: iwr https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
-
       - name: Submit winget manifest
         env:
-          WINGET_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
         run: |
           $id      = "MattWhitwam.Wahlberg"
           $version = "${{ steps.version.outputs.version }}"
-          $pkgDir  = "winget-manifest\manifests\m\MattWhitwam\Wahlberg\$version"
+          $branch  = "add-$id-$version"
+
+          gh repo fork microsoft/winget-pkgs --clone=false
+          $ghUser = gh api user --jq '.login'
+          gh repo clone "$ghUser/winget-pkgs" winget-pkgs-repo -- --depth=1
+          Set-Location winget-pkgs-repo
+
+          git config user.email "matthew.whitwam@dealx.com"
+          git config user.name "Matt Whitwam"
+          git checkout -b $branch
+
+          $pkgDir = "manifests/m/MattWhitwam/Wahlberg/$version"
           New-Item -ItemType Directory -Force -Path $pkgDir | Out-Null
 
           (@(
@@ -94,7 +102,7 @@ jobs:
             "DefaultLocale: en-US",
             "ManifestType: version",
             "ManifestVersion: 1.9.0"
-          ) -join "`n") | Set-Content "$pkgDir\$id.yaml" -Encoding UTF8
+          ) -join "`n") | Set-Content "$pkgDir/$id.yaml" -Encoding UTF8
 
           (@(
             "# yaml-language-server: `$schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json",
@@ -106,7 +114,7 @@ jobs:
             "  ProductId: 9PN7LZ0ZNX9X",
             "ManifestType: installer",
             "ManifestVersion: 1.9.0"
-          ) -join "`n") | Set-Content "$pkgDir\$id.installer.yaml" -Encoding UTF8
+          ) -join "`n") | Set-Content "$pkgDir/$id.installer.yaml" -Encoding UTF8
 
           (@(
             "# yaml-language-server: `$schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json",
@@ -123,6 +131,14 @@ jobs:
             "- viewer",
             "ManifestType: defaultLocale",
             "ManifestVersion: 1.9.0"
-          ) -join "`n") | Set-Content "$pkgDir\$id.locale.en-US.yaml" -Encoding UTF8
+          ) -join "`n") | Set-Content "$pkgDir/$id.locale.en-US.yaml" -Encoding UTF8
 
-          .\wingetcreate.exe submit $pkgDir --token $env:WINGET_TOKEN
+          git add .
+          git commit -m "Add $id $version"
+          git push origin $branch
+
+          gh pr create `
+            --repo microsoft/winget-pkgs `
+            --title "Add $id $version" `
+            --body "Add $id version $version." `
+            --head "${ghUser}:${branch}"
