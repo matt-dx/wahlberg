@@ -28,6 +28,7 @@ Wahlberg is a cross-platform Markdown viewer built with .NET MAUI Blazor Hybrid.
 **Blazor UI** (`Components/Pages/Home.razor`, `SettingsPanel.razor`) is a single-page app running inside that WebView. Components subscribe to service events (`StateChanged`, `ThemeChanged`) and call `InvokeAsync(StateHasChanged)` — there is no Flux/Redux-style state management. `IJSRuntime` and a `DotNetObjectReference<Home>` are passed into JavaScript for two-way interop.
 
 **Service Layer** (`Services/`) contains the business logic:
+
 - `TabService` — opens files, converts markdown to HTML via Markdig, extracts headings with regex, rewrites relative image `src` paths for WebView2, persists session state to `FileSystem.AppDataDirectory/session.json`. All heavy work runs on a background thread via `Task.Run` so the UI shows a loading spinner immediately.
 - `ThemeService` — loads/saves `ViewerTheme` objects as JSON files in `FileSystem.AppDataDirectory/themes/`.
 - `EditorService` — manages the configured external editor path and maps executable names to icon classes.
