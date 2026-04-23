@@ -61,6 +61,15 @@ jobs:
           $xml.SelectSingleNode("//ApplicationDisplayVersion").InnerText = $version
           $xml.Save((Resolve-Path $csproj))
 
+      - name: Publish Windows MSIX (Store upload)
+        run: >
+          dotnet publish wahlberg.maui/Wahlberg.Maui.csproj
+          -f net10.0-windows10.0.19041.0
+          -c Release
+          -p:AppxPackageSigningEnabled=false
+          -p:UapAppxPackageBuildMode=StoreUpload
+          -p:AppxSymbolPackageEnabled=false
+
       - name: Submit to Microsoft Store
         run: msstore publish wahlberg.maui --appId 9PN7LZ0ZNX9X
 
