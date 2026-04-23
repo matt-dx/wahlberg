@@ -87,10 +87,11 @@ jobs:
           $ghUser = gh api user --jq '.login'
           gh repo clone "$ghUser/winget-pkgs" winget-pkgs-repo -- --depth=1
           Set-Location winget-pkgs-repo
+          gh auth setup-git
 
           git config user.email "matthew.whitwam@dealx.com"
           git config user.name "Matt Whitwam"
-          git checkout -b $branch
+          git checkout -B $branch
 
           $pkgDir = "manifests/m/MattWhitwam/Wahlberg/$version"
           New-Item -ItemType Directory -Force -Path $pkgDir | Out-Null
@@ -133,12 +134,17 @@ jobs:
             "ManifestVersion: 1.9.0"
           ) -join "`n") | Set-Content "$pkgDir/$id.locale.en-US.yaml" -Encoding UTF8
 
-          git add .
+          git add -- $pkgDir
           git commit -m "Add $id $version"
-          git push origin $branch
+          git push origin $branch --force-with-lease
 
-          gh pr create `
-            --repo microsoft/winget-pkgs `
-            --title "Add $id $version" `
-            --body "Add $id version $version." `
-            --head "${ghUser}:${branch}"
+          $existingPr = gh pr list --repo microsoft/winget-pkgs --head "${ghUser}:${branch}" --json url --jq '.[0].url'
+          if ($existingPr) {
+            Write-Host "PR already exists: $existingPr"
+          } else {
+            gh pr create `
+              --repo microsoft/winget-pkgs `
+              --title "Add $id $version" `
+              --body "Add $id version $version." `
+              --head "${ghUser}:${branch}"
+          }
