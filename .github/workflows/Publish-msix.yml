@@ -61,27 +61,8 @@ jobs:
           $xml.SelectSingleNode("//ApplicationDisplayVersion").InnerText = $version
           $xml.Save((Resolve-Path $csproj))
 
-      - name: Publish Windows MSIX (Store upload)
-        run: >
-          dotnet publish wahlberg.maui/Wahlberg.Maui.csproj
-          -f net10.0-windows10.0.19041.0
-          -c Release
-          -p:AppxPackageSigningEnabled=false
-          -p:UapAppxPackageBuildMode=StoreUpload
-          -p:AppxSymbolPackageEnabled=false
-          -p:ApplicationDisplayVersion=${{ steps.version.outputs.version }}
-
-      - name: Find MSIX package
-        id: find-msix
-        run: |
-          $pkg = Get-ChildItem -Recurse -Include "*.msixupload","*.msix" |
-            Where-Object { $_.FullName -notmatch "_Test" -and $_.FullName -notmatch "Dependencies" } |
-            Select-Object -First 1
-          if (-not $pkg) { Write-Error "No .msix or .msixupload file found"; exit 1 }
-          echo "msix_dir=$($pkg.DirectoryName)" >> $env:GITHUB_OUTPUT
-
       - name: Submit to Microsoft Store
-        run: msstore publish wahlberg.maui --appId 9PN7LZ0ZNX9X --inputDirectory "${{ steps.find-msix.outputs.msix_dir }}"
+        run: msstore publish wahlberg.maui --appId 9PN7LZ0ZNX9X
 
       - name: Submit winget manifest
         env:
