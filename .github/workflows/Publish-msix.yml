@@ -83,6 +83,12 @@ jobs:
 
           gh repo fork microsoft/winget-pkgs --clone=false
           $ghUser = gh api user --jq '.login'
+          # Get zip URL and SHA256 from the GitHub Release for this tag
+          $zipUrl  = gh release view "v$version" --repo matt-dx/wahlberg --json assets --jq '.assets[] | select(.name=="Wahlberg-windows-x64.zip") | .browserDownloadUrl'
+          Invoke-WebRequest -Uri $zipUrl -OutFile release.zip
+          $sha256  = (Get-FileHash release.zip -Algorithm SHA256).Hash.ToLower()
+          Remove-Item release.zip
+
           gh repo clone "$ghUser/winget-pkgs" winget-pkgs-repo -- --depth=1
           Set-Location winget-pkgs-repo
           gh auth setup-git
@@ -108,9 +114,13 @@ jobs:
             "PackageIdentifier: $id",
             "PackageVersion: $version",
             "Installers:",
-            "- Architecture: neutral",
-            "  InstallerType: msstore",
-            "  ProductId: 9PN7LZ0ZNX9X",
+            "- Architecture: x64",
+            "  InstallerType: zip",
+            "  InstallerUrl: $zipUrl",
+            "  InstallerSha256: $sha256",
+            "  NestedInstallerType: portable",
+            "  NestedInstallerFiles:",
+            "  - RelativeFilePath: Wahlberg.exe",
             "ManifestType: installer",
             "ManifestVersion: 1.9.0"
           ) -join "`n") | Set-Content "$pkgDir/$id.installer.yaml" -Encoding UTF8
