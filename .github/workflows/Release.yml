@@ -139,7 +139,7 @@ jobs:
           } else {
             gh pr create `
               --repo microsoft/winget-pkgs `
-              --title "Add $id $version" `
+              --title "Update: $id version $version" `
               --body "Add $id version $version." `
               --head "${ghUser}:${branch}"
           }
