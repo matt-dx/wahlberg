@@ -56,13 +56,19 @@ jobs:
       - name: Create GitHub Release
         shell: bash
         run: |
-          gh release create "v1.${{ github.run_number }}.0" \
-            publish/Wahlberg-windows-x64.zip \
-            publish/android/*.apk \
-            --title 'Release v1.${{ github.run_number }}.0' \
-            --generate-notes
+          tag="v1.${{ github.run_number }}.0"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" publish/Wahlberg-windows-x64.zip publish/android/*.apk --clobber
+            gh release edit "$tag" --title "Release $tag" --generate-notes
+          else
+            gh release create "$tag" \
+              publish/Wahlberg-windows-x64.zip \
+              publish/android/*.apk \
+              --title "Release $tag" \
+              --generate-notes
+          fi
         env:
-          GH_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Submit winget manifest
         env:
@@ -75,13 +81,14 @@ jobs:
           $sha256  = (Get-FileHash publish/Wahlberg-windows-x64.zip -Algorithm SHA256).Hash.ToLower()
 
           gh repo fork microsoft/winget-pkgs --clone=false
-          $ghUser = gh api user --jq '.login'
+          $ghUser   = gh api user --jq '.login'
+          $ghUserId = gh api user --jq '.id'
           gh repo clone "$ghUser/winget-pkgs" winget-pkgs-repo -- --depth=1
           Set-Location winget-pkgs-repo
           gh auth setup-git
 
-          git config user.email "matthew.whitwam@dealx.com"
-          git config user.name "Matt Whitwam"
+          git config user.email "$ghUserId+$ghUser@users.noreply.github.com"
+          git config user.name "$ghUser"
           git checkout -B $branch
 
           $pkgDir = "manifests/m/MattWhitwam/Wahlberg/$version"
