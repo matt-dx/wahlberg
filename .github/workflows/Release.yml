@@ -8,7 +8,8 @@ on:
       - 'CLAUDE.md'
       - '.gitignore'
       - 'store-assets/**'
-      #- '.github/workflows/Publish-msix.yml'
+      - '.github/workflows/**'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -115,6 +116,9 @@ jobs:
             "  NestedInstallerType: portable",
             "  NestedInstallerFiles:",
             "  - RelativeFilePath: Wahlberg.exe",
+            "Dependencies:",
+            "  PackageDependencies:",
+            "  - PackageIdentifier: Microsoft.EdgeWebView2Runtime",
             "ManifestType: installer",
             "ManifestVersion: 1.9.0"
           ) -join "`n") | Set-Content "$pkgDir/$id.installer.yaml" -Encoding UTF8
