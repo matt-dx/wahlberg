@@ -42,6 +42,7 @@ jobs:
           -c Release
           -p:WindowsPackageType=None
           -p:SelfContained=true
+          -p:PublishSingleFile=true
           -o publish/windows
 
       - name: Zip Windows output
