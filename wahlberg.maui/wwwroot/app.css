@@ -727,6 +727,16 @@ body.drag-over::after {
     padding: 16px 20px;
 }
 
+.settings-footer {
+    flex-shrink: 0;
+    padding: 10px 20px;
+    border-top: 1px solid var(--theme-border, #333);
+    text-align: center;
+    font-size: 11px;
+    color: var(--theme-text, #ccc);
+    opacity: 0.5;
+}
+
 .settings-section {
     margin-bottom: 24px;
 }

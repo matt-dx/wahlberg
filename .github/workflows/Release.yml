@@ -70,7 +70,7 @@ jobs:
               --generate-notes
           fi
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
 
       - name: Submit winget manifest
         env:
