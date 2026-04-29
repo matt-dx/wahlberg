@@ -56,3 +56,4 @@ GoogleService-Info.plist
 # Other
 .claude/settings.local.json
 secrets.txt
+publish
