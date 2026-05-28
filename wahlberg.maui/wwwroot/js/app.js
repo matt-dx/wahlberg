@@ -59,6 +59,7 @@ window.appInterop = {
 
         this._setupScrollTracking();
         this._setupLinkHandling();
+        this._renderDiff();
         await this._renderMermaid();
     },
 
@@ -141,6 +142,34 @@ window.appInterop = {
 
         container.addEventListener('scroll', this._scrollHandler, { passive: true });
         setTimeout(this._scrollHandler, 100);
+    },
+
+    _renderDiff: function () {
+        document.querySelectorAll('code.language-diff').forEach(function (code) {
+            if (code.dataset.diffProcessed) return;
+            code.dataset.diffProcessed = 'true';
+
+            const escaped = code.textContent
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+
+            const lines = escaped.split('\n');
+            if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+
+            let inHunk = false;
+            code.innerHTML = lines.map(function (line) {
+                let cls = 'diff-context';
+                if (line.startsWith('@@')) {
+                    cls = 'diff-hunk';
+                    inHunk = true;
+                } else if (!inHunk && (line.startsWith('+++') || line.startsWith('---'))) {
+                    cls = 'diff-meta';
+                } else if (line.startsWith('+')) cls = 'diff-added';
+                else if (line.startsWith('-')) cls = 'diff-removed';
+                return '<span class="' + cls + '">' + line + '</span>';
+            }).join('');
+        });
     },
 
     _renderMermaid: async function () {
