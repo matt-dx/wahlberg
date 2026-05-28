@@ -1,5 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
+    <!-- Run unpackaged in Debug so F5 works without deploying an MSIX or
+         pre-installing the Windows App Runtime (same approach as DiffThis). -->
+    <PropertyGroup Condition="'$(Configuration)' == 'Debug' AND $([MSBuild]::IsOSPlatform('windows'))">
+        <WindowsPackageType>None</WindowsPackageType>
+    </PropertyGroup>
+
     <PropertyGroup>
         <TargetFrameworks>net10.0-android</TargetFrameworks>
         <TargetFrameworks Condition="!$([MSBuild]::IsOSPlatform('linux'))">$(TargetFrameworks);net10.0-ios;net10.0-maccatalyst</TargetFrameworks>

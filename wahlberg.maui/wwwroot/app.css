@@ -225,6 +225,39 @@ body.drag-over::after {
     margin-right: 0.5em;
 }
 
+/* ===== Diff ===== */
+.markdown-body pre code.language-diff {
+    display: block;
+}
+
+/* Full-width line highlights: negative margin cancels the pre's 16px padding,
+   padding restores the text indentation. */
+.markdown-body pre code.language-diff span {
+    display: block;
+    margin: 0 -16px;
+    padding: 1px 16px;
+}
+
+.markdown-body pre code.language-diff .diff-added {
+    background: rgba(70, 149, 74, 0.2);
+    color: #a8d8a8;
+}
+
+.markdown-body pre code.language-diff .diff-removed {
+    background: rgba(197, 52, 52, 0.2);
+    color: #f4a8a8;
+}
+
+.markdown-body pre code.language-diff .diff-hunk {
+    background: rgba(0, 120, 212, 0.1);
+    color: #7ec8e3;
+    font-style: italic;
+}
+
+.markdown-body pre code.language-diff .diff-meta {
+    color: #888;
+}
+
 /* ===== Mermaid ===== */
 .markdown-body .mermaid-rendered {
     text-align: center;
