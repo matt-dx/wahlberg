@@ -157,12 +157,16 @@ window.appInterop = {
             const lines = escaped.split('\n');
             if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
 
+            let inHunk = false;
             code.innerHTML = lines.map(function (line) {
                 let cls = 'diff-context';
-                if (line.startsWith('+++') || line.startsWith('---')) cls = 'diff-meta';
-                else if (line.startsWith('+')) cls = 'diff-added';
+                if (line.startsWith('@@')) {
+                    cls = 'diff-hunk';
+                    inHunk = true;
+                } else if (!inHunk && (line.startsWith('+++') || line.startsWith('---'))) {
+                    cls = 'diff-meta';
+                } else if (line.startsWith('+')) cls = 'diff-added';
                 else if (line.startsWith('-')) cls = 'diff-removed';
-                else if (line.startsWith('@@')) cls = 'diff-hunk';
                 return '<span class="' + cls + '">' + line + '</span>';
             }).join('');
         });
