@@ -128,6 +128,8 @@ body.drag-over::after {
 }
 .markdown-body h3 { font-size: 1.25em; }
 .markdown-body h4 { font-size: 1.1em; }
+.markdown-body h5 { font-size: 1em; }
+.markdown-body h6 { font-size: 1em; }
 
 .markdown-body p { margin: 0.8em 0; }
 
