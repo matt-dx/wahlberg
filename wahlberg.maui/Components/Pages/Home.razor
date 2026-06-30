@@ -127,7 +127,9 @@
         await ThemeService.InitializeAsync();
         await EditorService.InitializeAsync();
         await TabService.RestoreSessionAsync();
+#if !WINDOWS
         await OpenFileFromCommandLineAsync();
+#endif
         FileOpenRequest.FileRequested += OnFileRequestedFromIpc;
     }
 
