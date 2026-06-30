@@ -26,7 +26,7 @@ public partial class App : MauiWinUIApplication
 
         if (!isFirstInstance)
         {
-            var filePath = GetCommandLineFilePath();
+            var filePath = GetLaunchFilePath();
             if (filePath != null) SendFileToExistingInstance(filePath);
             Environment.Exit(0);
             return;
@@ -37,10 +37,27 @@ public partial class App : MauiWinUIApplication
         Task.Run(() => ListenForFileRequests(_pipeServerCts.Token));
 
         base.OnLaunched(args);
+
+        var startupFile = GetLaunchFilePath();
+        if (startupFile != null) FileOpenRequest.Raise(startupFile);
     }
 
-    private static string? GetCommandLineFilePath()
+    private static string? GetLaunchFilePath()
     {
+        // MSIX/packaged: file activation delivers the path via AppInstance activation args
+        try
+        {
+            var activation = Microsoft.Windows.AppLifecycle.AppInstance.GetCurrent().GetActivatedEventArgs();
+            if (activation?.Kind == Microsoft.Windows.AppLifecycle.ExtendedActivationKind.File &&
+                activation.Data is Windows.ApplicationModel.Activation.IFileActivatedEventArgs fileArgs)
+            {
+                var file = fileArgs.Files.OfType<Windows.Storage.StorageFile>().FirstOrDefault();
+                if (file != null) return file.Path;
+            }
+        }
+        catch { }
+
+        // Unpackaged/sideloaded: fall back to command-line args
         var args = Environment.GetCommandLineArgs();
         return args.Length >= 2 && File.Exists(args[1]) ? args[1] : null;
     }
