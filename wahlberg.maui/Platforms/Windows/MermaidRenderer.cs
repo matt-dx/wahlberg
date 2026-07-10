@@ -37,9 +37,11 @@ internal static class MermaidRenderer
 
         await using var hidden = await HiddenWebView.CreateAsync();
 
+        // theme: 'dark' matches the live viewer's own mermaid.initialize call (wwwroot/index.html)
+        // so exported diagrams look the same as they do on screen.
         var html = "<!DOCTYPE html><html><head><meta charset=\"utf-8\" /><script>"
             + mermaidJs
-            + "</script><script>mermaid.initialize({ startOnLoad: false });</script></head><body></body></html>";
+            + "</script><script>mermaid.initialize({ startOnLoad: false, theme: 'dark' });</script></head><body></body></html>";
 
         var tempHtmlPath = Path.Combine(FileSystem.CacheDirectory, $"{Guid.NewGuid()}.html");
         await File.WriteAllTextAsync(tempHtmlPath, html);
@@ -55,7 +57,21 @@ internal static class MermaidRenderer
                     for (let i = 0; i < sources.length; i++) {
                         try {
                             const { svg } = await mermaid.render('mmd-' + i, sources[i]);
-                            results.push(svg);
+                            // Mermaid's own SVG root uses width="100%" plus an internal
+                            // max-width style, which only resolves sensibly when it renders
+                            // straight into the live page's DOM. Used standalone as an <img>
+                            // source, that percentage has no defined reference size, so give
+                            // it explicit intrinsic dimensions from its viewBox instead — the
+                            // wrapping <img style="max-width:100%"> can then scale it down
+                            // consistently from that known base size.
+                            const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+                            const svgEl = doc.documentElement;
+                            const viewBox = (svgEl.getAttribute('viewBox') || '').split(/\s+/).map(Number);
+                            if (viewBox.length === 4 && viewBox.every(n => !isNaN(n))) {
+                                svgEl.setAttribute('width', viewBox[2]);
+                                svgEl.setAttribute('height', viewBox[3]);
+                            }
+                            results.push(new XMLSerializer().serializeToString(svgEl));
                         } catch (e) {
                             results.push('');
                         }

@@ -136,7 +136,14 @@ public partial class ExportService
                 if (string.IsNullOrEmpty(svg)) continue;
                 var dataUri = $"data:image/svg+xml;base64,{Convert.ToBase64String(Encoding.UTF8.GetBytes(svg))}";
                 var span = mermaidBlocks[i].Span;
-                replacements.Add((span.Start, span.End, $"![Mermaid diagram]({dataUri})"));
+                // Wrapped in a bordered/padded card (matching the live viewer's .mermaid-rendered
+                // style) so diagrams of wildly different native sizes still look consistent —
+                // a bare ![]() image has nothing to unify their scale. Raw HTML + inline styles
+                // keep this portable to viewers without the app's CSS (GitHub, VS Code, etc.).
+                var framed = "<div style=\"text-align:center;margin:1.5em 0;padding:16px;background:#252526;border:1px solid #888;border-radius:6px;\">\n"
+                    + $"<img src=\"{dataUri}\" alt=\"Mermaid diagram\" style=\"max-width:100%;height:auto;\" />\n"
+                    + "</div>";
+                replacements.Add((span.Start, span.End, framed));
             }
         }
 #endif
