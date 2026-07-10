@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Markdig;
@@ -154,7 +155,7 @@ public partial class TabService
             {
                 Level = int.Parse(match.Groups[1].Value),
                 Id = match.Groups[2].Value,
-                Text = HtmlTagRegex().Replace(match.Groups[3].Value, "").Trim()
+                Text = WebUtility.HtmlDecode(HtmlTagRegex().Replace(match.Groups[3].Value, "")).Trim()
             });
         }
 
@@ -168,7 +169,7 @@ public partial class TabService
     private static partial Regex HtmlTagRegex();
 
     [GeneratedRegex(@"(<img\b[^>]*?\bsrc\s*=\s*"")([^""]+)("")", RegexOptions.IgnoreCase)]
-    private static partial Regex ImgSrcRegex();
+    internal static partial Regex ImgSrcRegex();
 
     /// <summary>
     /// Rewrites relative image src paths to virtual-host URLs that WebView2 can resolve to local files.
