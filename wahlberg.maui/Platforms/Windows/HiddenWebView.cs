@@ -18,12 +18,14 @@ internal sealed class HiddenWebView : IAsyncDisposable
     public CoreWebView2Environment Environment { get; }
 
     private readonly Microsoft.UI.Xaml.Window _window;
+    private readonly string _userDataFolder;
 
-    private HiddenWebView(Microsoft.UI.Xaml.Window window, WebView2 view, CoreWebView2Environment environment)
+    private HiddenWebView(Microsoft.UI.Xaml.Window window, WebView2 view, CoreWebView2Environment environment, string userDataFolder)
     {
         _window = window;
         View = view;
         Environment = environment;
+        _userDataFolder = userDataFolder;
     }
 
     public static async Task<HiddenWebView> CreateAsync()
@@ -47,15 +49,15 @@ internal sealed class HiddenWebView : IAsyncDisposable
             "Creating the WebView2 environment");
         await WithTimeout(webview.EnsureCoreWebView2Async(env).AsTask(), "Initializing WebView2");
 
-        return new HiddenWebView(window, webview, env);
+        return new HiddenWebView(window, webview, env, userDataFolder);
     }
 
     public async Task NavigateAndWaitAsync(string url)
     {
-        var tcs = new TaskCompletionSource();
+        var tcs = new TaskCompletionSource<bool>();
         void OnNavigationCompleted(WebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
         {
-            if (args.IsSuccess) tcs.TrySetResult();
+            if (args.IsSuccess) tcs.TrySetResult(true);
             else tcs.TrySetException(new InvalidOperationException($"Navigation failed: {args.WebErrorStatus}"));
         }
 
@@ -89,13 +91,19 @@ internal sealed class HiddenWebView : IAsyncDisposable
     {
         // Closing WebView2/Window can block briefly tearing down the browser process —
         // defer it to the next UI-thread tick instead of blocking the current async chain
-        // (e.g. right after a script/postMessage round-trip) on that teardown.
+        // (e.g. right after a script/postMessage round-trip) on that teardown. The profile
+        // folder's own files can still be locked by that in-progress teardown, so give it a
+        // moment before attempting the (best-effort) delete.
         var view = View;
         var window = _window;
-        MainThread.BeginInvokeOnMainThread(() =>
+        var userDataFolder = _userDataFolder;
+        MainThread.BeginInvokeOnMainThread(async () =>
         {
             try { view.Close(); } catch { /* best effort */ }
             try { window.Close(); } catch { /* best effort */ }
+
+            await Task.Delay(TimeSpan.FromSeconds(2));
+            try { Directory.Delete(userDataFolder, recursive: true); } catch { /* best effort */ }
         });
         return ValueTask.CompletedTask;
     }

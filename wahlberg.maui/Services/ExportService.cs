@@ -159,9 +159,7 @@ public partial class ExportService
                 continue;
             }
 
-            string absolutePath;
-            try { absolutePath = Path.GetFullPath(Path.Combine(docDir, url)); }
-            catch { continue; }
+            if (!TryResolveWithinDirectory(docDir, url, out var absolutePath)) continue;
             if (!File.Exists(absolutePath)) continue;
 
             var bytes = await File.ReadAllBytesAsync(absolutePath);
@@ -170,7 +168,11 @@ public partial class ExportService
 
             var span = link.Span;
             var original = markdown.Substring(span.Start, span.End - span.Start + 1);
-            replacements.Add((span.Start, span.End, original.Replace(url, dataUri)));
+            var urlIndex = original.IndexOf(url, StringComparison.Ordinal);
+            var replaced = urlIndex >= 0
+                ? original[..urlIndex] + dataUri + original[(urlIndex + url.Length)..]
+                : original;
+            replacements.Add((span.Start, span.End, replaced));
         }
 
         replacements.Sort((a, b) => a.Start.CompareTo(b.Start));
@@ -256,7 +258,7 @@ public partial class ExportService
 
             try
             {
-                var absolutePath = Path.GetFullPath(Path.Combine(documentDirectory, src));
+                if (!TryResolveWithinDirectory(documentDirectory, src, out var absolutePath)) return match.Value;
                 if (!File.Exists(absolutePath)) return match.Value;
 
                 var bytes = File.ReadAllBytes(absolutePath);
@@ -280,6 +282,28 @@ public partial class ExportService
         ".bmp" => "image/bmp",
         _ => "application/octet-stream"
     };
+
+    // Resolves relativePath against baseDirectory and rejects anything that escapes it (e.g. via
+    // "../"), so a document can't embed and re-share arbitrary files elsewhere on disk.
+    private static bool TryResolveWithinDirectory(string baseDirectory, string relativePath, out string absolutePath)
+    {
+        absolutePath = "";
+        try
+        {
+            var baseFull = Path.GetFullPath(baseDirectory);
+            var candidate = Path.GetFullPath(Path.Combine(baseFull, relativePath));
+            var baseWithSeparator = baseFull.EndsWith(Path.DirectorySeparatorChar) ? baseFull : baseFull + Path.DirectorySeparatorChar;
+            if (!candidate.StartsWith(baseWithSeparator, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            absolutePath = candidate;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     [GeneratedRegex(@"<(hr|br|img)\b([^>]*?)(?<!/)>", RegexOptions.IgnoreCase)]
     private static partial Regex VoidElementRegex();

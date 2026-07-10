@@ -8,14 +8,14 @@ internal static class PdfExporter
 {
     public static Task ExportAsync(string html, string outputPath)
     {
-        var tcs = new TaskCompletionSource();
+        var tcs = new TaskCompletionSource<bool>();
 
         MainThread.BeginInvokeOnMainThread(async () =>
         {
             try
             {
                 await RenderAsync(html, outputPath);
-                tcs.SetResult();
+                tcs.SetResult(true);
             }
             catch (Exception ex)
             {
