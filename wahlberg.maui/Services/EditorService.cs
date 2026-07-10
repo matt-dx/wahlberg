@@ -47,12 +47,22 @@ public class EditorService
         if (string.IsNullOrEmpty(EditorPath) || !File.Exists(EditorPath)) return;
         try
         {
-            Process.Start(new ProcessStartInfo
+            var startInfo = new ProcessStartInfo
             {
                 FileName = EditorPath,
                 Arguments = $"\"{filePath}\"",
                 UseShellExecute = false
-            });
+            };
+
+            // If Wahlberg itself was launched from an Electron-based host (VS Code, Claude
+            // Code, etc.), ELECTRON_RUN_AS_NODE may be set in our environment and would be
+            // inherited by the child process. Electron editors (VS Code, Atom, ...) honor
+            // that variable by running as plain Node instead of launching their GUI, which
+            // then fails trying to execute the target file as a script. Strip it so the
+            // editor always launches normally.
+            startInfo.EnvironmentVariables.Remove("ELECTRON_RUN_AS_NODE");
+
+            Process.Start(startInfo);
         }
         catch (Exception ex)
         {

@@ -10,6 +10,16 @@
     <button class="toolbar-btn" @onclick="OpenFile" title="Open File">
         <i class="bi bi-folder2-open"></i> Open
     </button>
+    @if (!string.IsNullOrEmpty(EditorService.EditorPath))
+    {
+        var (editorIcon, _) = EditorService.GetEditorInfo(EditorService.EditorPath);
+        <button class="toolbar-btn" @onclick="EditCurrentFile" title="Open in editor" disabled="@(TabService.ActiveDocument is null)">
+            <i class="@(editorIcon)"></i> Edit
+        </button>
+    }
+    <button class="toolbar-btn" @onclick="ToggleExport" title="Export" disabled="@(TabService.ActiveDocument is null)">
+        <i class="bi bi-box-arrow-up"></i> Export
+    </button>
     <div class="toolbar-spacer"></div>
     <button class="toolbar-btn settings-btn" @onclick="ToggleSettings" title="Settings">
         <i class="bi bi-gear"></i>
@@ -37,7 +47,6 @@
                 {
                     @if (_tocVisible)
                     {
-                        var (editorIcon, _) = EditorService.GetEditorInfo(EditorService.EditorPath);
                         <div class="toc-panel">
                             <div class="toc-header">
                                 <span>Contents</span>
@@ -54,25 +63,12 @@
                                     </a>
                                 }
                             </nav>
-                            @if (!string.IsNullOrEmpty(EditorService.EditorPath))
-                            {
-                                <button class="toc-edit-full-btn" @onclick="EditCurrentFile" title="Open in editor">
-                                    <i class="@(editorIcon)"></i> Edit
-                                </button>
-                            }
                         </div>
                     }
                     else
                     {
-                        var (editorIcon, _) = EditorService.GetEditorInfo(EditorService.EditorPath);
                         <div class="toc-collapsed-panel">
                             <button class="toc-show-btn" @onclick="ToggleToc" title="Show Table of Contents"><i class="bi bi-list"></i></button>
-                            @if (!string.IsNullOrEmpty(EditorService.EditorPath))
-                            {
-                                <button class="toc-edit-icon-btn" @onclick="EditCurrentFile" title="Open in editor">
-                                    <i class="@(editorIcon)"></i>
-                                </button>
-                            }
                         </div>
                     }
                 }
@@ -111,9 +107,15 @@
     <SettingsPanel OnClose="ToggleSettings" />
 }
 
+@if (_exportVisible)
+{
+    <ExportPanel OnClose="ToggleExport" />
+}
+
 @code {
     private bool _tocVisible = true;
     private bool _settingsVisible;
+    private bool _exportVisible;
     private string _activeHeadingId = "";
     private DotNetObjectReference<Home>? _dotNetRef;
     private Guid? _lastProcessedDocId;
@@ -288,6 +290,8 @@
     private void ToggleToc() => _tocVisible = !_tocVisible;
 
     private void ToggleSettings() => _settingsVisible = !_settingsVisible;
+
+    private void ToggleExport() => _exportVisible = !_exportVisible;
 
     private async Task ScrollToHeading(string id)
     {

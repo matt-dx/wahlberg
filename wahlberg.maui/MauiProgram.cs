@@ -20,6 +20,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<Services.TabService>();
 		builder.Services.AddSingleton<Services.ThemeService>();
 		builder.Services.AddSingleton<Services.EditorService>();
+		builder.Services.AddSingleton<Services.ExportService>();
 
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();
