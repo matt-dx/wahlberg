@@ -1,0 +1,213 @@
+@using CommunityToolkit.Maui.Storage
+@inject TabService TabService
+@inject ExportService ExportService
+
+<div class="settings-overlay" @onclick="Close">
+    <div class="settings-panel" @onclick:stopPropagation="true">
+        <div class="settings-header">
+            <h3>Export</h3>
+            <button class="settings-close-btn" @onclick="Close"><i class="bi bi-x"></i></button>
+        </div>
+
+        <div class="settings-body">
+            <section class="settings-section">
+                <h4>Format</h4>
+                <div class="export-radio-group">
+                    <label>
+                        <input type="radio" name="export-format" disabled="@(!IsWindows)"
+                               checked="@(_options.Format == ExportFormat.Pdf)"
+                               @onchange="() => _options.Format = ExportFormat.Pdf" />
+                        PDF@(IsWindows ? "" : " (Windows only)")
+                    </label>
+                    <label>
+                        <input type="radio" name="export-format"
+                               checked="@(_options.Format == ExportFormat.Epub)"
+                               @onchange="() => _options.Format = ExportFormat.Epub" />
+                        EPUB
+                    </label>
+                    <label>
+                        <input type="radio" name="export-format"
+                               checked="@(_options.Format == ExportFormat.EmbeddedMarkdown)"
+                               @onchange="() => _options.Format = ExportFormat.EmbeddedMarkdown" />
+                        Embedded Markdown
+                    </label>
+                </div>
+                @if (_options.Format == ExportFormat.EmbeddedMarkdown)
+                {
+                    <p class="export-format-note">
+                        Exports the original Markdown as-is, with images and Mermaid diagrams embedded inline as base64@(IsWindows ? "" : " (diagrams require Windows)").
+                        Table of contents, pagination, and cover page don't apply to this format.
+                    </p>
+                }
+            </section>
+
+            @if (_options.Format != ExportFormat.EmbeddedMarkdown)
+            {
+                <section class="settings-section">
+                    <h4>Table of Contents</h4>
+                    <label><input type="checkbox" @bind="_options.IncludeToc" /> Include table of contents</label>
+                    @if (_options.IncludeToc)
+                    {
+                        <div class="export-toc-levels">
+                            @for (var level = 1; level <= 6; level++)
+                            {
+                                var lvl = level;
+                                <label>
+                                    <input type="checkbox" checked="@_options.TocHeadingLevels.Contains(lvl)"
+                                           @onchange="e => ToggleTocLevel(lvl, e)" /> H@(lvl)
+                                </label>
+                            }
+                        </div>
+                    }
+                </section>
+
+                <section class="settings-section">
+                    <h4>Pagination</h4>
+                    <label><input type="checkbox" @bind="_options.SplitOnHorizontalRule" /> Split on horizontal rule (<code>---</code>)</label>
+                    <div class="setting-row">
+                        <label>Also split before heading level</label>
+                        <select @bind="_splitLevelSelection">
+                            <option value="0">Don't split by heading</option>
+                            @for (var level = 1; level <= 6; level++)
+                            {
+                                <option value="@level">H@(level) and above</option>
+                            }
+                        </select>
+                    </div>
+                </section>
+
+                <section class="settings-section">
+                    <h4>Cover Page</h4>
+                    <div class="export-radio-group">
+                        <label>
+                            <input type="radio" name="cover-mode" checked="@(_options.CoverPage == CoverPageMode.None)"
+                                   @onchange="() => _options.CoverPage = CoverPageMode.None" /> None
+                        </label>
+                        <label>
+                            <input type="radio" name="cover-mode" checked="@(_options.CoverPage == CoverPageMode.FirstSection)"
+                                   @onchange="() => _options.CoverPage = CoverPageMode.FirstSection" /> First section of document
+                        </label>
+                        <label>
+                            <input type="radio" name="cover-mode" checked="@(_options.CoverPage == CoverPageMode.ExternalImage)"
+                                   @onchange="() => _options.CoverPage = CoverPageMode.ExternalImage" /> External image
+                        </label>
+                    </div>
+                    @if (_options.CoverPage == CoverPageMode.ExternalImage)
+                    {
+                        <div class="export-cover-picker">
+                            <button class="btn-secondary" @onclick="PickCoverImage">Choose Image…</button>
+                            <span>@(string.IsNullOrEmpty(_options.CoverImagePath) ? "No image selected" : Path.GetFileName(_options.CoverImagePath))</span>
+                        </div>
+                    }
+                </section>
+            }
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <p class="export-error">@_errorMessage</p>
+            }
+        </div>
+
+        <div class="settings-footer">
+            <button class="btn-primary" @onclick="DoExport" disabled="@(_exporting || TabService.ActiveDocument is null)">
+                @(_exporting ? "Exporting…" : "Export")
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private readonly ExportOptions _options = new();
+    private bool _exporting;
+    private string? _errorMessage;
+
+    private static bool IsWindows => DeviceInfo.Current.Platform == DevicePlatform.WinUI;
+
+    private int _splitLevelSelection
+    {
+        get => _options.SplitAtHeadingLevel ?? 0;
+        set => _options.SplitAtHeadingLevel = value == 0 ? null : value;
+    }
+
+    protected override void OnInitialized()
+    {
+        if (!IsWindows) _options.Format = ExportFormat.Epub;
+    }
+
+    private void ToggleTocLevel(int level, ChangeEventArgs e)
+    {
+        var isChecked = e.Value is bool b && b;
+        if (isChecked) _options.TocHeadingLevels.Add(level);
+        else _options.TocHeadingLevels.Remove(level);
+    }
+
+    private async Task PickCoverImage()
+    {
+        try
+        {
+            var result = await FilePicker.Default.PickAsync(new PickOptions
+            {
+                PickerTitle = "Select a cover image",
+                FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+                {
+                    { DevicePlatform.WinUI, [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"] },
+                    { DevicePlatform.macOS, ["png", "jpg", "jpeg", "gif", "bmp", "webp"] },
+                    { DevicePlatform.iOS, ["public.image"] },
+                    { DevicePlatform.Android, ["image/*"] },
+                })
+            });
+            if (result is not null)
+                _options.CoverImagePath = result.FullPath;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Cover image pick error: {ex.Message}");
+        }
+    }
+
+    private async Task DoExport()
+    {
+        var doc = TabService.ActiveDocument;
+        if (doc is null) return;
+
+        _exporting = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        var extension = _options.Format switch
+        {
+            ExportFormat.Pdf => "pdf",
+            ExportFormat.Epub => "epub",
+            _ => "md"
+        };
+        var tempPath = Path.Combine(FileSystem.CacheDirectory, $"{Guid.NewGuid()}.{extension}");
+
+        try
+        {
+            await ExportService.ExportAsync(doc, _options, tempPath);
+
+            var fileName = $"{Path.GetFileNameWithoutExtension(doc.FileName)}.{extension}";
+            await using (var stream = File.OpenRead(tempPath))
+            {
+                await FileSaver.Default.SaveAsync(fileName, stream, default);
+            }
+
+            await Close();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Export failed: {ex.Message}";
+            System.Diagnostics.Debug.WriteLine($"Export error: {ex.Message}");
+        }
+        finally
+        {
+            try { File.Delete(tempPath); } catch { /* best effort */ }
+            _exporting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Close() => await OnClose.InvokeAsync();
+}

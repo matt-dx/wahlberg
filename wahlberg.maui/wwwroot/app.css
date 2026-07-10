@@ -494,31 +494,6 @@ body.drag-over::after {
     color: var(--theme-heading, #fff);
 }
 
-.toc-edit-full-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    width: 100%;
-    padding: 7px 14px;
-    border: none;
-    border-top: 1px solid var(--theme-border, #333);
-    background: transparent;
-    color: var(--theme-text, #999);
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    flex-shrink: 0;
-    transition: all 0.15s;
-}
-
-.toc-edit-full-btn:hover {
-    background: rgba(255, 255, 255, 0.04);
-    color: var(--theme-heading, #fff);
-}
-
 .toc-collapsed-panel {
     display: flex;
     flex-direction: column;
@@ -529,27 +504,6 @@ body.drag-over::after {
     flex-shrink: 0;
     padding-top: 12px;
     gap: 4px;
-}
-
-.toc-edit-icon-btn {
-    width: 28px;
-    height: 28px;
-    border: none;
-    border-radius: 3px;
-    background: transparent;
-    color: var(--theme-text, #999);
-    cursor: pointer;
-    font-size: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    transition: all 0.15s;
-}
-
-.toc-edit-icon-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--theme-heading, #fff);
 }
 
 .toc-nav {
@@ -970,6 +924,52 @@ body.drag-over::after {
 .btn-secondary:hover {
     background: rgba(255, 255, 255, 0.05);
     border-color: var(--theme-accent, #0078d4);
+}
+
+/* Export panel */
+.export-radio-group,
+.export-toc-levels {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.export-toc-levels {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.export-radio-group label,
+.export-toc-levels label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--theme-text, #ccc);
+}
+
+.export-cover-picker {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--theme-text, #999);
+}
+
+.export-error {
+    color: #e05252;
+    font-size: 12px;
+    margin: 8px 0 0 0;
+}
+
+.export-format-note {
+    font-size: 12px;
+    color: var(--theme-text, #999);
+    margin: 8px 0 0 0;
+    line-height: 1.5;
 }
 
 /* External Editor row */
