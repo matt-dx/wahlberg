@@ -16,19 +16,19 @@
                     <label>
                         <input type="radio" name="export-format" disabled="@(!IsWindows)"
                                checked="@(_options.Format == ExportFormat.Pdf)"
-                               @onclick="() => _options.Format = ExportFormat.Pdf" />
+                               @onchange="() => _options.Format = ExportFormat.Pdf" />
                         PDF@(IsWindows ? "" : " (Windows only)")
                     </label>
                     <label>
                         <input type="radio" name="export-format"
                                checked="@(_options.Format == ExportFormat.Epub)"
-                               @onclick="() => _options.Format = ExportFormat.Epub" />
+                               @onchange="() => _options.Format = ExportFormat.Epub" />
                         EPUB
                     </label>
                     <label>
                         <input type="radio" name="export-format"
                                checked="@(_options.Format == ExportFormat.EmbeddedMarkdown)"
-                               @onclick="() => _options.Format = ExportFormat.EmbeddedMarkdown" />
+                               @onchange="() => _options.Format = ExportFormat.EmbeddedMarkdown" />
                         Embedded Markdown
                     </label>
                 </div>
@@ -81,15 +81,15 @@
                     <div class="export-radio-group">
                         <label>
                             <input type="radio" name="cover-mode" checked="@(_options.CoverPage == CoverPageMode.None)"
-                                   @onclick="() => _options.CoverPage = CoverPageMode.None" /> None
+                                   @onchange="() => _options.CoverPage = CoverPageMode.None" /> None
                         </label>
                         <label>
                             <input type="radio" name="cover-mode" checked="@(_options.CoverPage == CoverPageMode.FirstSection)"
-                                   @onclick="() => _options.CoverPage = CoverPageMode.FirstSection" /> First section of document
+                                   @onchange="() => _options.CoverPage = CoverPageMode.FirstSection" /> First section of document
                         </label>
                         <label>
                             <input type="radio" name="cover-mode" checked="@(_options.CoverPage == CoverPageMode.ExternalImage)"
-                                   @onclick="() => _options.CoverPage = CoverPageMode.ExternalImage" /> External image
+                                   @onchange="() => _options.CoverPage = CoverPageMode.ExternalImage" /> External image
                         </label>
                     </div>
                     @if (_options.CoverPage == CoverPageMode.ExternalImage)

@@ -293,7 +293,10 @@ public partial class ExportService
             var baseFull = Path.GetFullPath(baseDirectory);
             var candidate = Path.GetFullPath(Path.Combine(baseFull, relativePath));
             var baseWithSeparator = baseFull.EndsWith(Path.DirectorySeparatorChar) ? baseFull : baseFull + Path.DirectorySeparatorChar;
-            if (!candidate.StartsWith(baseWithSeparator, StringComparison.OrdinalIgnoreCase))
+            // Windows/macOS filesystems are typically case-insensitive; Android/Linux are
+            // case-sensitive, where a differently-cased prefix must NOT be treated as a match.
+            var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            if (!candidate.StartsWith(baseWithSeparator, comparison))
                 return false;
 
             absolutePath = candidate;
