@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -18,7 +19,11 @@ jobs:
         id: version
         shell: bash
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION="0.0.$GITHUB_RUN_NUMBER"
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Publishing version $VERSION"
 
@@ -37,9 +42,13 @@ jobs:
           --clientId ${{ secrets.AZURE_CLIENT_ID }}
           --clientSecret ${{ secrets.AZURE_CLIENT_SECRET }}
 
+      - name: List Store apps (debug)
+        run: msstore apps list
+
       - name: Check for pending submission
         run: |
           $output = msstore submission status 9PN7LZ0ZNX9X 2>&1 | Out-String
+          Write-Output $output
           $clean = $output -replace '\x1b\[[\d;]*[mGKHF]', ''
           if ($clean -match 'Submission Status\s*=\s*(\S+)') {
             $status = $Matches[1].Trim()
