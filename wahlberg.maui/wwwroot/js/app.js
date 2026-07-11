@@ -65,7 +65,8 @@ window.appInterop = {
 
     // Takes a .NET DotNetStreamReference instead of an inline string, so large diffs don't
     // ride over a single Blazor Server SignalR message (which has a default size limit and
-    // can disconnect the circuit) — the stream is transferred and read in chunks instead.
+    // can disconnect the circuit) — the .NET-to-JS transfer itself is chunked, even though
+    // arrayBuffer() below buffers the full result into memory on the JS side afterward.
     downloadFileFromStream: async function (fileName, contentStreamReference) {
         const arrayBuffer = await contentStreamReference.arrayBuffer();
         const blob = new Blob([arrayBuffer], { type: 'text/plain' });

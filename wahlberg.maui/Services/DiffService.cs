@@ -237,8 +237,23 @@ public class DiffService
         List<(string Signature, string Html)> leftBlocks,
         List<(string Signature, string Html)> rightBlocks)
     {
-        var oldJoined = string.Join(BlockDelimiter, leftBlocks.Select(b => b.Signature));
-        var newJoined = string.Join(BlockDelimiter, rightBlocks.Select(b => b.Signature));
+        // Map each distinct block signature to a short numeric token instead of joining the raw
+        // signatures directly: a raw signature is an arbitrary markdown substring and could contain
+        // BlockDelimiter itself, which would corrupt tokenization on Split. Numeric tokens can't
+        // collide with the delimiter and are far smaller than the block text for large documents.
+        var tokens = new Dictionary<string, string>();
+        string TokenFor(string signature)
+        {
+            if (!tokens.TryGetValue(signature, out var token))
+            {
+                token = tokens.Count.ToString();
+                tokens[signature] = token;
+            }
+            return token;
+        }
+
+        var oldJoined = string.Join(BlockDelimiter, leftBlocks.Select(b => TokenFor(b.Signature)));
+        var newJoined = string.Join(BlockDelimiter, rightBlocks.Select(b => TokenFor(b.Signature)));
         // text.Split on an empty string yields [""] (one token), which would desync from an
         // empty block list (zero blocks) and cause out-of-range indexing when rendering.
         return new Differ().CreateCustomDiffs(oldJoined, newJoined, false,
