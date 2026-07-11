@@ -80,7 +80,7 @@
             .ToList();
     }
 
-    private bool CanCompare => _selectedOpenDoc is not null || !string.IsNullOrEmpty(_browsedPath);
+    private bool CanCompare => _selectedOpenDoc is not null || !string.IsNullOrWhiteSpace(_browsedPath);
 
     private void SelectOpenDocument(MarkdownDocument doc)
     {
@@ -90,7 +90,7 @@
 
     private void OnPathTyped(ChangeEventArgs e)
     {
-        _browsedPath = e.Value?.ToString();
+        _browsedPath = e.Value?.ToString()?.Trim();
         _selectedOpenDoc = null;
     }
 

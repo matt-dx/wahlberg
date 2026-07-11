@@ -7,5 +7,5 @@ namespace Wahlberg.Services;
 /// </summary>
 public static class AppMode
 {
-    public static bool IsServiceMode { get; set; }
+    public static bool IsServiceMode { get; internal set; }
 }
