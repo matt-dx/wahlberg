@@ -1,0 +1,162 @@
+@using CommunityToolkit.Maui.Storage
+@inject TabService TabService
+@inject DiffService DiffService
+
+<div class="settings-overlay" @onclick="Close">
+    <div class="settings-panel" @onclick:stopPropagation="true">
+        <div class="settings-header">
+            <h3>Compare With</h3>
+            <button class="settings-close-btn" @onclick="Close"><i class="bi bi-x"></i></button>
+        </div>
+
+        <div class="settings-body">
+            <section class="settings-section">
+                <h4>Open Documents</h4>
+                @if (_otherOpenDocuments.Count == 0)
+                {
+                    <p class="export-format-note">No other documents are open.</p>
+                }
+                else
+                {
+                    <div class="export-radio-group">
+                        @foreach (var doc in _otherOpenDocuments)
+                        {
+                            <label title="@doc.FilePath">
+                                <input type="radio" name="diff-target"
+                                       checked="@(_selectedOpenDoc == doc)"
+                                       @onchange="() => SelectOpenDocument(doc)" />
+                                @doc.FileName
+                            </label>
+                        }
+                    </div>
+                }
+            </section>
+
+            <section class="settings-section">
+                <h4>Or Choose a File</h4>
+                <div class="export-cover-picker">
+                    <button class="btn-secondary" @onclick="BrowseForFile">Browse…</button>
+                    <span>@(string.IsNullOrEmpty(_browsedPath) ? "No file selected" : Path.GetFileName(_browsedPath))</span>
+                </div>
+            </section>
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <p class="export-error">@_errorMessage</p>
+            }
+        </div>
+
+        <div class="settings-footer">
+            <button class="btn-secondary" @onclick="Close">Cancel</button>
+            <button class="btn-primary" @onclick="Compare" disabled="@(!CanCompare || _comparing)">
+                @(_comparing ? "Comparing…" : "Compare")
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private MarkdownDocument? _selectedOpenDoc;
+    private string? _browsedPath;
+    private bool _comparing;
+    private string? _errorMessage;
+
+    private List<MarkdownDocument> _otherOpenDocuments = [];
+
+    protected override void OnInitialized()
+    {
+        _otherOpenDocuments = TabService.OpenDocuments
+            .Where(d => !d.IsDiff && d != TabService.ActiveDocument)
+            .ToList();
+    }
+
+    private bool CanCompare => _selectedOpenDoc is not null || !string.IsNullOrEmpty(_browsedPath);
+
+    private void SelectOpenDocument(MarkdownDocument doc)
+    {
+        _selectedOpenDoc = doc;
+        _browsedPath = null;
+    }
+
+    private async Task BrowseForFile()
+    {
+        try
+        {
+            var customFileType = new FilePickerFileType(
+                new Dictionary<DevicePlatform, IEnumerable<string>>
+                {
+                    { DevicePlatform.WinUI, [".md", ".markdown", ".mdown", ".mkd", ".mkdn"] },
+                    { DevicePlatform.macOS, ["md", "markdown"] },
+                    { DevicePlatform.iOS, ["public.text"] },
+                    { DevicePlatform.Android, ["text/markdown", "text/plain"] },
+                });
+
+            var result = await FilePicker.Default.PickAsync(new PickOptions
+            {
+                PickerTitle = "Select a Markdown file to compare",
+                FileTypes = customFileType
+            });
+
+            if (result is not null)
+            {
+                _browsedPath = result.FullPath;
+                _selectedOpenDoc = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Diff file pick error: {ex.Message}");
+        }
+    }
+
+    private async Task Compare()
+    {
+        var left = TabService.ActiveDocument;
+        if (left is null || !CanCompare) return;
+
+        _comparing = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            MarkdownDocument right;
+            if (_selectedOpenDoc is not null)
+            {
+                right = _selectedOpenDoc;
+            }
+            else
+            {
+                var path = _browsedPath!;
+                var content = await File.ReadAllTextAsync(path);
+                await TabService.AddDocumentAsync(path, content);
+                right = TabService.OpenDocuments.First(d => d.FilePath == path);
+            }
+
+            var (unifiedHtml, sideBySideHtml, unifiedText) = await Task.Run(() =>
+            {
+                var html = DiffService.BuildUnifiedHtml(left.Content, right.Content);
+                var sideBySide = DiffService.BuildSideBySideHtml(left.Content, right.Content);
+                var text = DiffService.BuildUnifiedDiffText(left.FileName, left.Content, right.FileName, right.Content);
+                return (html, sideBySide, text);
+            });
+
+            TabService.AddDiffDocument(left, right, unifiedHtml, sideBySideHtml, unifiedText);
+            await Close();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Diff failed: {ex.Message}";
+            System.Diagnostics.Debug.WriteLine($"Diff error: {ex.Message}");
+        }
+        finally
+        {
+            _comparing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Close() => await OnClose.InvokeAsync();
+}

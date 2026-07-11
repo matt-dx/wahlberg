@@ -95,6 +95,34 @@ public partial class TabService
             _ = SaveSessionAsync();
     }
 
+    public void AddDiffDocument(MarkdownDocument left, MarkdownDocument right, string unifiedHtml, string sideBySideHtml, string unifiedText)
+    {
+        var title = $"{left.FileName} ↔ {right.FileName}";
+        var existing = OpenDocuments.FirstOrDefault(d => d.IsDiff && d.FilePath == title);
+        if (existing is not null)
+        {
+            ActiveDocument = existing;
+            StateChanged?.Invoke();
+            return;
+        }
+
+        var doc = new MarkdownDocument
+        {
+            FilePath = title,
+            Content = unifiedText,
+            IsDiff = true,
+            DiffLeftLabel = left.FileName,
+            DiffRightLabel = right.FileName,
+            DiffUnifiedHtml = unifiedHtml,
+            DiffSideBySideHtml = sideBySideHtml,
+            IsLoading = false
+        };
+
+        OpenDocuments.Add(doc);
+        ActiveDocument = doc;
+        StateChanged?.Invoke();
+    }
+
     public void SetActiveDocument(MarkdownDocument doc)
     {
         ActiveDocument = doc;
@@ -126,8 +154,8 @@ public partial class TabService
         {
             var session = new SessionState
             {
-                OpenFiles = OpenDocuments.Select(d => d.FilePath).ToList(),
-                ActiveFile = ActiveDocument?.FilePath
+                OpenFiles = OpenDocuments.Where(d => !d.IsDiff).Select(d => d.FilePath).ToList(),
+                ActiveFile = ActiveDocument is { IsDiff: false } ? ActiveDocument.FilePath : null
             };
             var json = JsonSerializer.Serialize(session);
             await File.WriteAllTextAsync(_sessionPath, json);

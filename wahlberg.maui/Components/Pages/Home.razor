@@ -10,16 +10,22 @@
     <button class="toolbar-btn" @onclick="OpenFile" title="Open File">
         <i class="bi bi-folder2-open"></i> Open
     </button>
-    @if (!string.IsNullOrEmpty(EditorService.EditorPath))
+    @if (TabService.ActiveDocument is { IsDiff: false })
     {
-        var (editorIcon, _) = EditorService.GetEditorInfo(EditorService.EditorPath);
-        <button class="toolbar-btn" @onclick="EditCurrentFile" title="Open in editor" disabled="@(TabService.ActiveDocument is null)">
-            <i class="@(editorIcon)"></i> Edit
+        @if (!string.IsNullOrEmpty(EditorService.EditorPath))
+        {
+            var (editorIcon, _) = EditorService.GetEditorInfo(EditorService.EditorPath);
+            <button class="toolbar-btn" @onclick="EditCurrentFile" title="Open in editor">
+                <i class="@(editorIcon)"></i> Edit
+            </button>
+        }
+        <button class="toolbar-btn" @onclick="ToggleExport" title="Export">
+            <i class="bi bi-box-arrow-up"></i> Export
+        </button>
+        <button class="toolbar-btn" @onclick="ToggleDiff" title="Diff">
+            <i class="bi bi-file-diff"></i> Diff
         </button>
     }
-    <button class="toolbar-btn" @onclick="ToggleExport" title="Export" disabled="@(TabService.ActiveDocument is null)">
-        <i class="bi bi-box-arrow-up"></i> Export
-    </button>
     <div class="toolbar-spacer"></div>
     <button class="toolbar-btn settings-btn" @onclick="ToggleSettings" title="Settings">
         <i class="bi bi-gear"></i>
@@ -73,7 +79,26 @@
                     }
                 }
 
-                @if (TabService.ActiveDocument.IsLoading)
+                @if (TabService.ActiveDocument.IsDiff)
+                {
+                    <div class="document-content diff-content">
+                        <div class="diff-toolbar">
+                            <span class="diff-title">@TabService.ActiveDocument.DiffLeftLabel ↔ @TabService.ActiveDocument.DiffRightLabel</span>
+                            <div class="diff-toolbar-actions">
+                                <button class="btn-secondary" @onclick="ToggleDiffLayout" title="Toggle layout">
+                                    <i class="bi bi-layout-split"></i> @(TabService.ActiveDocument.DiffShowSideBySide ? "Unified" : "Side-by-side")
+                                </button>
+                                <button class="btn-primary" @onclick="SaveDiff" title="Save diff">
+                                    <i class="bi bi-floppy"></i> Save Diff
+                                </button>
+                            </div>
+                        </div>
+                        <div class="diff-view">
+                            @((MarkupString)(TabService.ActiveDocument.DiffShowSideBySide ? TabService.ActiveDocument.DiffSideBySideHtml : TabService.ActiveDocument.DiffUnifiedHtml))
+                        </div>
+                    </div>
+                }
+                else if (TabService.ActiveDocument.IsLoading)
                 {
                     <div class="loading-state">
                         <div class="loading-spinner"></div>
@@ -112,10 +137,16 @@
     <ExportPanel OnClose="ToggleExport" />
 }
 
+@if (_diffPickerVisible)
+{
+    <DiffPickerPanel OnClose="ToggleDiff" />
+}
+
 @code {
     private bool _tocVisible = true;
     private bool _settingsVisible;
     private bool _exportVisible;
+    private bool _diffPickerVisible;
     private string _activeHeadingId = "";
     private DotNetObjectReference<Home>? _dotNetRef;
     private Guid? _lastProcessedDocId;
@@ -182,8 +213,11 @@
         {
             _lastProcessedDocId = doc.Id;
             _activeHeadingId = "";
-            await Task.Delay(50);
-            await JS.InvokeVoidAsync("appInterop.processContent", _dotNetRef);
+            if (!doc.IsDiff)
+            {
+                await Task.Delay(50);
+                await JS.InvokeVoidAsync("appInterop.processContent", _dotNetRef);
+            }
         }
     }
 
@@ -292,6 +326,35 @@
     private void ToggleSettings() => _settingsVisible = !_settingsVisible;
 
     private void ToggleExport() => _exportVisible = !_exportVisible;
+
+    private void ToggleDiff() => _diffPickerVisible = !_diffPickerVisible;
+
+    private void ToggleDiffLayout()
+    {
+        var doc = TabService.ActiveDocument;
+        if (doc is null || !doc.IsDiff) return;
+        doc.DiffShowSideBySide = !doc.DiffShowSideBySide;
+        StateHasChanged();
+    }
+
+    private async Task SaveDiff()
+    {
+        var doc = TabService.ActiveDocument;
+        if (doc is null || !doc.IsDiff) return;
+
+        try
+        {
+            var leftName = Path.GetFileNameWithoutExtension(doc.DiffLeftLabel);
+            var rightName = Path.GetFileNameWithoutExtension(doc.DiffRightLabel);
+            var bytes = System.Text.Encoding.UTF8.GetBytes(doc.Content);
+            using var stream = new MemoryStream(bytes);
+            await FileSaver.Default.SaveAsync($"{leftName}_vs_{rightName}.diff", stream, default);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Save diff error: {ex.Message}");
+        }
+    }
 
     private async Task ScrollToHeading(string id)
     {
