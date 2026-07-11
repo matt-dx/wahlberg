@@ -63,8 +63,16 @@ window.appInterop = {
         await this._renderMermaid();
     },
 
-    downloadTextFile: function (fileName, content) {
-        const blob = new Blob([content], { type: 'text/plain' });
+    // Takes a .NET DotNetStreamReference instead of an inline string, so large diffs don't
+    // ride over a single Blazor Server SignalR message (which has a default size limit and
+    // can disconnect the circuit) — the stream is transferred and read in chunks instead.
+    downloadFileFromStream: async function (fileName, contentStreamReference) {
+        const arrayBuffer = await contentStreamReference.arrayBuffer();
+        const blob = new Blob([arrayBuffer], { type: 'text/plain' });
+        this._triggerDownload(fileName, blob);
+    },
+
+    _triggerDownload: function (fileName, blob) {
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement('a');
         anchor.href = url;

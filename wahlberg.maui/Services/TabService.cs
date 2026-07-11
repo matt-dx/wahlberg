@@ -113,7 +113,8 @@ public partial class TabService
         string unifiedText)
     {
         var title = $"{left.FileName} ↔ {right.FileName}";
-        var existing = OpenDocuments.FirstOrDefault(d => d.IsDiff && d.FilePath == title);
+        var existing = OpenDocuments.FirstOrDefault(d =>
+            d.IsDiff && d.DiffLeftPath == left.FilePath && d.DiffRightPath == right.FilePath);
         if (existing is not null)
         {
             SetActive(existing);
@@ -128,6 +129,8 @@ public partial class TabService
             IsDiff = true,
             DiffLeftLabel = left.FileName,
             DiffRightLabel = right.FileName,
+            DiffLeftPath = left.FilePath,
+            DiffRightPath = right.FilePath,
             DiffUnifiedHtml = unifiedHtml,
             DiffSideBySideHtml = sideBySideHtml,
             DiffRenderedUnifiedHtml = renderedUnifiedHtml,

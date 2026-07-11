@@ -13,6 +13,8 @@ public class MarkdownDocument
     public bool IsDiff { get; init; } = false;
     public string? DiffLeftLabel { get; init; }
     public string? DiffRightLabel { get; init; }
+    public string? DiffLeftPath { get; init; }
+    public string? DiffRightPath { get; init; }
     public string DiffUnifiedHtml { get; init; } = string.Empty;
     public string DiffSideBySideHtml { get; init; } = string.Empty;
     public string DiffRenderedUnifiedHtml { get; init; } = string.Empty;

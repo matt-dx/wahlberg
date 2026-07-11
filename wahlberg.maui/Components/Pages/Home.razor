@@ -482,13 +482,17 @@
 
         try
         {
+            var bytes = System.Text.Encoding.UTF8.GetBytes(doc.Content);
+
             if (AppMode.IsServiceMode)
             {
-                await JS.InvokeVoidAsync("appInterop.downloadTextFile", fileName, doc.Content);
+                // Streamed (not passed as a single JS-interop string argument) so large diffs
+                // don't exceed Blazor Server's SignalR message size limit and disconnect the circuit.
+                using var streamRef = new DotNetStreamReference(new MemoryStream(bytes));
+                await JS.InvokeVoidAsync("appInterop.downloadFileFromStream", fileName, streamRef);
                 return;
             }
 
-            var bytes = System.Text.Encoding.UTF8.GetBytes(doc.Content);
             using var stream = new MemoryStream(bytes);
             await FileSaver.Default.SaveAsync(fileName, stream, default);
         }
