@@ -59,8 +59,8 @@ public class DiffService
         {
             var cssClass = line.Type switch
             {
-                ChangeType.Deleted when isOldSide => "diff-line-removed",
-                ChangeType.Inserted when !isOldSide => "diff-line-added",
+                ChangeType.Deleted or ChangeType.Modified when isOldSide => "diff-line-removed",
+                ChangeType.Inserted or ChangeType.Modified when !isOldSide => "diff-line-added",
                 ChangeType.Imaginary => "diff-line-imaginary",
                 _ => "diff-line-unchanged"
             };

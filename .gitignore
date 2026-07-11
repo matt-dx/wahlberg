@@ -55,5 +55,6 @@ GoogleService-Info.plist
 
 # Other
 .claude/settings.local.json
+.claude/skill-state/
 secrets.txt
 publish
