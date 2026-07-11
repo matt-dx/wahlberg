@@ -60,7 +60,8 @@ public partial class App : MauiWinUIApplication
         if (serveIndex < 0) return false;
 
         var portIndex = Array.IndexOf(args, "--port");
-        if (portIndex >= 0 && portIndex + 1 < args.Length && int.TryParse(args[portIndex + 1], out var parsed))
+        if (portIndex >= 0 && portIndex + 1 < args.Length &&
+            int.TryParse(args[portIndex + 1], out var parsed) && parsed is > 0 and <= 65535)
             port = parsed;
 
         return true;

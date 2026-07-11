@@ -101,16 +101,19 @@
                                 @if (TabService.ActiveDocument.DiffMode != DiffViewMode.Raw)
                                 {
                                     <button class="btn-secondary" @onclick="ToggleDiffLayout"
-                                            title="@(TabService.ActiveDocument.DiffShowSideBySide ? "Unified" : "Side-by-side")">
+                                            title="@(TabService.ActiveDocument.DiffShowSideBySide ? "Unified" : "Side-by-side")"
+                                            aria-label="@(TabService.ActiveDocument.DiffShowSideBySide ? "Unified" : "Side-by-side")">
                                         <i class="bi @(TabService.ActiveDocument.DiffShowSideBySide ? "bi-square" : "bi-layout-split")"></i>
                                     </button>
                                     <button class="btn-secondary" @onclick="ToggleDiffStyle"
-                                            title="@(DiffStyleLabel(TabService.ActiveDocument.DiffMode))">
+                                            title="@(DiffStyleLabel(TabService.ActiveDocument.DiffMode))"
+                                            aria-label="@(DiffStyleLabel(TabService.ActiveDocument.DiffMode))">
                                         @((MarkupString)DiffStyleIcon(TabService.ActiveDocument.DiffMode))
                                     </button>
                                 }
                                 <button class="btn-secondary" @onclick="ToggleDiffRaw"
-                                        title="@(DiffRawLabel(TabService.ActiveDocument.DiffMode))">
+                                        title="@(DiffRawLabel(TabService.ActiveDocument.DiffMode))"
+                                        aria-label="@(DiffRawLabel(TabService.ActiveDocument.DiffMode))">
                                     @((MarkupString)DiffRawIcon(TabService.ActiveDocument.DiffMode))
                                 </button>
                                 <button class="btn-primary" @onclick="SaveDiff" title="Save diff">

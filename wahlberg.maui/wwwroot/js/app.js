@@ -69,10 +69,12 @@ window.appInterop = {
         const anchor = document.createElement('a');
         anchor.href = url;
         anchor.download = fileName;
+        anchor.style.display = 'none';
         document.body.appendChild(anchor);
         anchor.click();
         anchor.remove();
-        URL.revokeObjectURL(url);
+        // Some browsers cancel the download if the blob URL is revoked immediately.
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     },
 
     scrollToHeading: function (id) {
