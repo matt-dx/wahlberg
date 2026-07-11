@@ -98,25 +98,35 @@
                         <div class="diff-toolbar">
                             <span class="diff-title">@TabService.ActiveDocument.DiffLeftLabel ↔ @TabService.ActiveDocument.DiffRightLabel</span>
                             <div class="diff-toolbar-actions">
-                                @if (!TabService.ActiveDocument.DiffShowPlainText)
+                                @if (TabService.ActiveDocument.DiffMode != DiffViewMode.Raw)
                                 {
                                     <button class="btn-secondary" @onclick="ToggleDiffLayout"
                                             title="@(TabService.ActiveDocument.DiffShowSideBySide ? "Unified" : "Side-by-side")">
                                         <i class="bi @(TabService.ActiveDocument.DiffShowSideBySide ? "bi-square" : "bi-layout-split")"></i>
                                     </button>
+                                    <button class="btn-secondary" @onclick="ToggleDiffStyle"
+                                            title="@(DiffStyleLabel(TabService.ActiveDocument.DiffMode))">
+                                        <i class="bi @(DiffStyleIcon(TabService.ActiveDocument.DiffMode))"></i>
+                                    </button>
                                 }
-                                <button class="btn-secondary" @onclick="ToggleDiffPlainText"
-                                        title="@(TabService.ActiveDocument.DiffShowPlainText ? "Rendered" : "Plain text")">
-                                    <i class="bi @(TabService.ActiveDocument.DiffShowPlainText ? "bi-file-richtext" : "bi-code-slash")"></i>
+                                <button class="btn-secondary" @onclick="ToggleDiffRaw"
+                                        title="@(DiffRawLabel(TabService.ActiveDocument))">
+                                    <i class="bi @(DiffRawIcon(TabService.ActiveDocument))"></i>
                                 </button>
                                 <button class="btn-primary" @onclick="SaveDiff" title="Save diff">
                                     <i class="bi bi-floppy"></i> Save Diff
                                 </button>
                             </div>
                         </div>
-                        @if (TabService.ActiveDocument.DiffShowPlainText)
+                        @if (TabService.ActiveDocument.DiffMode == DiffViewMode.Raw)
                         {
                             <pre class="diff-plain-text">@TabService.ActiveDocument.Content</pre>
+                        }
+                        else if (TabService.ActiveDocument.DiffMode == DiffViewMode.Rendered)
+                        {
+                            <div class="diff-view diff-rendered markdown-body">
+                                @((MarkupString)(TabService.ActiveDocument.DiffShowSideBySide ? TabService.ActiveDocument.DiffRenderedSideBySideHtml : TabService.ActiveDocument.DiffRenderedUnifiedHtml))
+                            </div>
                         }
                         else
                         {
@@ -178,6 +188,8 @@
     private string _activeHeadingId = "";
     private DotNetObjectReference<Home>? _dotNetRef;
     private Guid? _lastProcessedDocId;
+    private DiffViewMode? _lastProcessedDiffMode;
+    private bool? _lastProcessedDiffLayout;
 
     protected override async Task OnInitializedAsync()
     {
@@ -237,15 +249,26 @@
         }
 
         var doc = TabService.ActiveDocument;
-        if (doc is not null && !doc.IsLoading && doc.Id != _lastProcessedDocId)
+        if (doc is not null && !doc.IsLoading)
         {
-            _lastProcessedDocId = doc.Id;
-            _activeHeadingId = "";
-            if (!doc.IsDiff)
+            var isNewDoc = doc.Id != _lastProcessedDocId;
+            var isRenderedDiff = doc.IsDiff && doc.DiffMode == DiffViewMode.Rendered;
+            var renderedDiffChanged = isRenderedDiff &&
+                (_lastProcessedDiffMode != DiffViewMode.Rendered || _lastProcessedDiffLayout != doc.DiffShowSideBySide);
+
+            if (isNewDoc || renderedDiffChanged)
             {
-                await Task.Delay(50);
-                await JS.InvokeVoidAsync("appInterop.processContent", _dotNetRef);
+                if (isNewDoc) _activeHeadingId = "";
+                if (!doc.IsDiff || doc.DiffMode == DiffViewMode.Rendered)
+                {
+                    await Task.Delay(50);
+                    await JS.InvokeVoidAsync("appInterop.processContent", _dotNetRef);
+                }
             }
+
+            _lastProcessedDocId = doc.Id;
+            _lastProcessedDiffMode = doc.IsDiff ? doc.DiffMode : null;
+            _lastProcessedDiffLayout = doc.IsDiff ? doc.DiffShowSideBySide : null;
         }
     }
 
@@ -390,13 +413,38 @@
         StateHasChanged();
     }
 
-    private void ToggleDiffPlainText()
+    private void ToggleDiffStyle()
     {
         var doc = TabService.ActiveDocument;
         if (doc is null || !doc.IsDiff) return;
-        doc.DiffShowPlainText = !doc.DiffShowPlainText;
+        doc.DiffMode = doc.DiffMode == DiffViewMode.Rendered ? DiffViewMode.Highlighted : DiffViewMode.Rendered;
+        doc.DiffNonRawMode = doc.DiffMode;
         StateHasChanged();
     }
+
+    private void ToggleDiffRaw()
+    {
+        var doc = TabService.ActiveDocument;
+        if (doc is null || !doc.IsDiff) return;
+        doc.DiffMode = doc.DiffMode == DiffViewMode.Raw ? doc.DiffNonRawMode : DiffViewMode.Raw;
+        StateHasChanged();
+    }
+
+    private static string ModeIcon(DiffViewMode mode) => mode == DiffViewMode.Rendered ? "bi-file-richtext" : "bi-palette";
+
+    private static string ModeLabel(DiffViewMode mode) => mode == DiffViewMode.Rendered ? "Rendered" : "Highlighted source";
+
+    private static string DiffStyleIcon(DiffViewMode currentMode) =>
+        ModeIcon(currentMode == DiffViewMode.Rendered ? DiffViewMode.Highlighted : DiffViewMode.Rendered);
+
+    private static string DiffStyleLabel(DiffViewMode currentMode) =>
+        ModeLabel(currentMode == DiffViewMode.Rendered ? DiffViewMode.Highlighted : DiffViewMode.Rendered);
+
+    private static string DiffRawIcon(MarkdownDocument doc) =>
+        doc.DiffMode == DiffViewMode.Raw ? ModeIcon(doc.DiffNonRawMode) : "bi-code-slash";
+
+    private static string DiffRawLabel(MarkdownDocument doc) =>
+        doc.DiffMode == DiffViewMode.Raw ? ModeLabel(doc.DiffNonRawMode) : "Raw text";
 
     private async Task SaveDiff()
     {

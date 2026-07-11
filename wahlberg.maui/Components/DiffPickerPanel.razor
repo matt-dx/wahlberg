@@ -149,15 +149,20 @@
                 right = TabService.OpenDocuments.First(d => d.FilePath == path);
             }
 
-            var (unifiedHtml, sideBySideHtml, unifiedText) = await Task.Run(() =>
+            var leftDir = Path.GetDirectoryName(left.FilePath);
+            var rightDir = Path.GetDirectoryName(right.FilePath);
+
+            var (unifiedHtml, sideBySideHtml, renderedUnifiedHtml, renderedSideBySideHtml, unifiedText) = await Task.Run(() =>
             {
                 var html = DiffService.BuildUnifiedHtml(left.Content, right.Content);
                 var sideBySide = DiffService.BuildSideBySideHtml(left.Content, right.Content);
+                var renderedHtml = DiffService.BuildRenderedUnifiedHtml(left.Content, right.Content, leftDir, rightDir);
+                var renderedSideBySide = DiffService.BuildRenderedSideBySideHtml(left.Content, right.Content, leftDir, rightDir);
                 var text = DiffService.BuildUnifiedDiffText(left.FileName, left.Content, right.FileName, right.Content);
-                return (html, sideBySide, text);
+                return (html, sideBySide, renderedHtml, renderedSideBySide, text);
             });
 
-            TabService.AddDiffDocument(left, right, unifiedHtml, sideBySideHtml, unifiedText);
+            TabService.AddDiffDocument(left, right, unifiedHtml, sideBySideHtml, renderedUnifiedHtml, renderedSideBySideHtml, unifiedText);
             await Close();
         }
         catch (Exception ex)

@@ -15,6 +15,11 @@ public class MarkdownDocument
     public string? DiffRightLabel { get; init; }
     public string DiffUnifiedHtml { get; init; } = string.Empty;
     public string DiffSideBySideHtml { get; init; } = string.Empty;
+    public string DiffRenderedUnifiedHtml { get; init; } = string.Empty;
+    public string DiffRenderedSideBySideHtml { get; init; } = string.Empty;
     public bool DiffShowSideBySide { get; set; }
-    public bool DiffShowPlainText { get; set; }
+    public DiffViewMode DiffMode { get; set; } = DiffViewMode.Rendered;
+
+    /// <summary>Last Rendered/Highlighted choice, so the Raw-text toggle can restore it.</summary>
+    public DiffViewMode DiffNonRawMode { get; set; } = DiffViewMode.Rendered;
 }

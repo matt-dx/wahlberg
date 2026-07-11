@@ -95,7 +95,11 @@ public partial class TabService
             _ = SaveSessionAsync();
     }
 
-    public void AddDiffDocument(MarkdownDocument left, MarkdownDocument right, string unifiedHtml, string sideBySideHtml, string unifiedText)
+    public void AddDiffDocument(
+        MarkdownDocument left, MarkdownDocument right,
+        string unifiedHtml, string sideBySideHtml,
+        string renderedUnifiedHtml, string renderedSideBySideHtml,
+        string unifiedText)
     {
         var title = $"{left.FileName} ↔ {right.FileName}";
         var existing = OpenDocuments.FirstOrDefault(d => d.IsDiff && d.FilePath == title);
@@ -115,6 +119,8 @@ public partial class TabService
             DiffRightLabel = right.FileName,
             DiffUnifiedHtml = unifiedHtml,
             DiffSideBySideHtml = sideBySideHtml,
+            DiffRenderedUnifiedHtml = renderedUnifiedHtml,
+            DiffRenderedSideBySideHtml = renderedSideBySideHtml,
             IsLoading = false
         };
 
@@ -202,7 +208,7 @@ public partial class TabService
     /// <summary>
     /// Rewrites relative image src paths to virtual-host URLs that WebView2 can resolve to local files.
     /// </summary>
-    private static string ResolveLocalPaths(string html, string documentDirectory)
+    internal static string ResolveLocalPaths(string html, string documentDirectory)
     {
         return ImgSrcRegex().Replace(html, match =>
         {

@@ -375,6 +375,39 @@ body.drag-over::after {
     border-left: none;
 }
 
+/* Rendered-markdown diff mode: block-level diff of the actual parsed/rendered markdown
+   (as opposed to .diff-view's raw-text line diff) — reset the monospace font .diff-view
+   sets so nested markdown-body typography (headings, bold, etc.) applies normally. */
+.diff-rendered {
+    font-family: var(--theme-font);
+    font-size: var(--theme-font-size);
+}
+
+.diff-block {
+    margin: 0.5em 0;
+    padding: 4px 12px;
+    border-radius: 4px;
+}
+
+.diff-block-added {
+    background: rgba(70, 149, 74, 0.12);
+    border-left: 3px solid rgba(70, 149, 74, 0.7);
+}
+
+.diff-block-removed {
+    background: rgba(197, 52, 52, 0.12);
+    border-left: 3px solid rgba(197, 52, 52, 0.7);
+    opacity: 0.75;
+}
+
+.diff-block-unchanged {
+    border-left: 3px solid transparent;
+}
+
+.diff-block-imaginary {
+    min-height: 1px;
+}
+
 /* ===== Mermaid ===== */
 .markdown-body .mermaid-rendered {
     text-align: center;
