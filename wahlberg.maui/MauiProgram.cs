@@ -1,4 +1,5 @@
 using CommunityToolkit.Maui;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Wahlberg;
@@ -17,10 +18,7 @@ public static class MauiProgram
 			});
 
 		builder.Services.AddMauiBlazorWebView();
-		builder.Services.AddSingleton<Services.TabService>();
-		builder.Services.AddSingleton<Services.ThemeService>();
-		builder.Services.AddSingleton<Services.EditorService>();
-		builder.Services.AddSingleton<Services.ExportService>();
+		RegisterSharedServices(builder.Services);
 
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();
@@ -28,5 +26,19 @@ public static class MauiProgram
 #endif
 
 		return builder.Build();
+	}
+
+	/// <summary>
+	/// Service registrations shared between the native MAUI app and the
+	/// Windows-only Kestrel/Blazor Server host (<c>--serve</c> mode), so both
+	/// hosting models build identical service graphs.
+	/// </summary>
+	internal static void RegisterSharedServices(IServiceCollection services)
+	{
+		services.AddSingleton<Services.TabService>();
+		services.AddSingleton<Services.ThemeService>();
+		services.AddSingleton<Services.EditorService>();
+		services.AddSingleton<Services.ExportService>();
+		services.AddSingleton<Services.DiffService>();
 	}
 }

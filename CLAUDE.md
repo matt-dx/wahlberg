@@ -48,6 +48,10 @@ Wahlberg is a cross-platform Markdown viewer built with .NET MAUI Blazor Hybrid.
 
 On first launch, `RegisterFileAssociations()` writes `HKCU\Software\Classes` entries for `.md`, `.markdown`, etc. so the OS offers Wahlberg as an opener.
 
+## Windows-specific: service mode (`--serve`)
+
+`Platforms/Windows/App.xaml.cs` checks for `--serve`/`--port` at the very top of `OnLaunched`, before the single-instance mutex — if present, it hands off to `Platforms/Windows/ServiceHost.cs`, which hosts the same Blazor UI over Kestrel/Blazor Server instead of the native window, and never touches the mutex/IPC/window-creation path. Service registrations are shared between the native app and this host via `MauiProgram.RegisterSharedServices()`. UI that depends on a native window (file pickers, PDF/Mermaid export) checks `Services.AppMode.IsServiceMode` to fall back to a browser-safe alternative or hide itself. See `docs/as.is/service-mode.md` for the full design and known gotchas (webroot path resolution, missing `blazor.web.js` under `Sdk.Razor`).
+
 ## File-opening entry points
 
 Four distinct paths all converge on `TabService.AddDocumentAsync()`:

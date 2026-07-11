@@ -10,21 +10,40 @@
     <button class="toolbar-btn" @onclick="OpenFile" title="Open File">
         <i class="bi bi-folder2-open"></i> Open
     </button>
-    @if (!string.IsNullOrEmpty(EditorService.EditorPath))
+    @if (TabService.ActiveDocument is { IsDiff: false })
     {
-        var (editorIcon, _) = EditorService.GetEditorInfo(EditorService.EditorPath);
-        <button class="toolbar-btn" @onclick="EditCurrentFile" title="Open in editor" disabled="@(TabService.ActiveDocument is null)">
-            <i class="@(editorIcon)"></i> Edit
+        @if (!string.IsNullOrEmpty(EditorService.EditorPath))
+        {
+            var (editorIcon, _) = EditorService.GetEditorInfo(EditorService.EditorPath);
+            <button class="toolbar-btn" @onclick="EditCurrentFile" title="Open in editor">
+                <i class="@(editorIcon)"></i> Edit
+            </button>
+        }
+        @if (!AppMode.IsServiceMode)
+        {
+            <button class="toolbar-btn" @onclick="ToggleExport" title="Export">
+                <i class="bi bi-box-arrow-up"></i> Export
+            </button>
+        }
+        <button class="toolbar-btn" @onclick="ToggleDiff" title="Diff">
+            <i class="bi bi-file-diff"></i> Diff
         </button>
     }
-    <button class="toolbar-btn" @onclick="ToggleExport" title="Export" disabled="@(TabService.ActiveDocument is null)">
-        <i class="bi bi-box-arrow-up"></i> Export
-    </button>
     <div class="toolbar-spacer"></div>
     <button class="toolbar-btn settings-btn" @onclick="ToggleSettings" title="Settings">
         <i class="bi bi-gear"></i>
     </button>
 </div>
+
+@if (_showPathInput)
+{
+    <div class="path-input-bar">
+        <input @bind="_pathInputValue" @bind:event="oninput" @onkeydown="OnPathInputKeyDown"
+               placeholder="Enter full file path…" class="text-input" autofocus />
+        <button class="btn-primary" @onclick="SubmitPathInput">Open</button>
+        <button class="btn-secondary" @onclick="() => _showPathInput = false">Cancel</button>
+    </div>
+}
 
 <div class="workspace @(TabService.Orientation == TabOrientation.Vertical ? "vertical" : "horizontal")">
     @if (TabService.OpenDocuments.Count > 0)
@@ -73,7 +92,54 @@
                     }
                 }
 
-                @if (TabService.ActiveDocument.IsLoading)
+                @if (TabService.ActiveDocument.IsDiff)
+                {
+                    <div class="document-content diff-content">
+                        <div class="diff-toolbar">
+                            <span class="diff-title">@TabService.ActiveDocument.DiffLeftLabel ↔ @TabService.ActiveDocument.DiffRightLabel</span>
+                            <div class="diff-toolbar-actions">
+                                @if (TabService.ActiveDocument.DiffMode != DiffViewMode.Raw)
+                                {
+                                    <button class="btn-secondary" @onclick="ToggleDiffLayout"
+                                            title="@(TabService.ActiveDocument.DiffShowSideBySide ? "Unified" : "Side-by-side")"
+                                            aria-label="@(TabService.ActiveDocument.DiffShowSideBySide ? "Unified" : "Side-by-side")">
+                                        <i class="bi @(TabService.ActiveDocument.DiffShowSideBySide ? "bi-square" : "bi-layout-split")"></i>
+                                    </button>
+                                    <button class="btn-secondary" @onclick="ToggleDiffStyle"
+                                            title="@(DiffStyleLabel(TabService.ActiveDocument.DiffMode))"
+                                            aria-label="@(DiffStyleLabel(TabService.ActiveDocument.DiffMode))">
+                                        @((MarkupString)DiffStyleIcon(TabService.ActiveDocument.DiffMode))
+                                    </button>
+                                }
+                                <button class="btn-secondary" @onclick="ToggleDiffRaw"
+                                        title="@(DiffRawLabel(TabService.ActiveDocument.DiffMode))"
+                                        aria-label="@(DiffRawLabel(TabService.ActiveDocument.DiffMode))">
+                                    @((MarkupString)DiffRawIcon(TabService.ActiveDocument.DiffMode))
+                                </button>
+                                <button class="btn-primary" @onclick="SaveDiff" title="Save diff">
+                                    <i class="bi bi-floppy"></i> Save Diff
+                                </button>
+                            </div>
+                        </div>
+                        @if (TabService.ActiveDocument.DiffMode == DiffViewMode.Raw)
+                        {
+                            <pre class="diff-plain-text">@TabService.ActiveDocument.Content</pre>
+                        }
+                        else if (TabService.ActiveDocument.DiffMode == DiffViewMode.Rendered)
+                        {
+                            <div class="diff-view diff-rendered markdown-body">
+                                @((MarkupString)(TabService.ActiveDocument.DiffShowSideBySide ? TabService.ActiveDocument.DiffRenderedSideBySideHtml : TabService.ActiveDocument.DiffRenderedUnifiedHtml))
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="diff-view">
+                                @((MarkupString)(TabService.ActiveDocument.DiffShowSideBySide ? TabService.ActiveDocument.DiffSideBySideHtml : TabService.ActiveDocument.DiffUnifiedHtml))
+                            </div>
+                        }
+                    </div>
+                }
+                else if (TabService.ActiveDocument.IsLoading)
                 {
                     <div class="loading-state">
                         <div class="loading-spinner"></div>
@@ -112,13 +178,21 @@
     <ExportPanel OnClose="ToggleExport" />
 }
 
+@if (_diffPickerVisible)
+{
+    <DiffPickerPanel OnClose="ToggleDiff" />
+}
+
 @code {
     private bool _tocVisible = true;
     private bool _settingsVisible;
     private bool _exportVisible;
+    private bool _diffPickerVisible;
     private string _activeHeadingId = "";
     private DotNetObjectReference<Home>? _dotNetRef;
     private Guid? _lastProcessedDocId;
+    private DiffViewMode? _lastProcessedDiffMode;
+    private bool? _lastProcessedDiffLayout;
 
     protected override async Task OnInitializedAsync()
     {
@@ -178,12 +252,26 @@
         }
 
         var doc = TabService.ActiveDocument;
-        if (doc is not null && !doc.IsLoading && doc.Id != _lastProcessedDocId)
+        if (doc is not null && !doc.IsLoading)
         {
+            var isNewDoc = doc.Id != _lastProcessedDocId;
+            var isRenderedDiff = doc.IsDiff && doc.DiffMode == DiffViewMode.Rendered;
+            var renderedDiffChanged = isRenderedDiff &&
+                (_lastProcessedDiffMode != DiffViewMode.Rendered || _lastProcessedDiffLayout != doc.DiffShowSideBySide);
+
+            if (isNewDoc || renderedDiffChanged)
+            {
+                if (isNewDoc) _activeHeadingId = "";
+                if (!doc.IsDiff || doc.DiffMode == DiffViewMode.Rendered)
+                {
+                    await Task.Delay(50);
+                    await JS.InvokeVoidAsync("appInterop.processContent", _dotNetRef);
+                }
+            }
+
             _lastProcessedDocId = doc.Id;
-            _activeHeadingId = "";
-            await Task.Delay(50);
-            await JS.InvokeVoidAsync("appInterop.processContent", _dotNetRef);
+            _lastProcessedDiffMode = doc.IsDiff ? doc.DiffMode : null;
+            _lastProcessedDiffLayout = doc.IsDiff ? doc.DiffShowSideBySide : null;
         }
     }
 
@@ -243,8 +331,17 @@
         _ = TabService.AddDocumentAsync(fileName, content);
     }
 
+    private bool _showPathInput;
+    private string _pathInputValue = "";
+
     private async Task OpenFile()
     {
+        if (AppMode.IsServiceMode)
+        {
+            _showPathInput = true;
+            return;
+        }
+
         try
         {
             var customFileType = new FilePickerFileType(
@@ -275,6 +372,29 @@
         }
     }
 
+    private async Task SubmitPathInput()
+    {
+        var path = _pathInputValue.Trim();
+        _showPathInput = false;
+        _pathInputValue = "";
+        if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;
+
+        try
+        {
+            var content = await File.ReadAllTextAsync(path);
+            await TabService.AddDocumentAsync(path, content);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error opening file: {ex.Message}");
+        }
+    }
+
+    private async Task OnPathInputKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await SubmitPathInput();
+    }
+
     private void CloseTab(MarkdownDocument doc)
     {
         TabService.CloseDocument(doc);
@@ -292,6 +412,102 @@
     private void ToggleSettings() => _settingsVisible = !_settingsVisible;
 
     private void ToggleExport() => _exportVisible = !_exportVisible;
+
+    private void ToggleDiff() => _diffPickerVisible = !_diffPickerVisible;
+
+    private void ToggleDiffLayout()
+    {
+        var doc = TabService.ActiveDocument;
+        if (doc is null || !doc.IsDiff) return;
+        doc.DiffShowSideBySide = !doc.DiffShowSideBySide;
+        StateHasChanged();
+    }
+
+    private void ToggleDiffStyle()
+    {
+        var doc = TabService.ActiveDocument;
+        if (doc is null || !doc.IsDiff) return;
+        doc.DiffMode = doc.DiffMode == DiffViewMode.Rendered ? DiffViewMode.Highlighted : DiffViewMode.Rendered;
+        doc.DiffNonRawMode = doc.DiffMode;
+        StateHasChanged();
+    }
+
+    private void ToggleDiffRaw()
+    {
+        var doc = TabService.ActiveDocument;
+        if (doc is null || !doc.IsDiff) return;
+        doc.DiffMode = doc.DiffMode == DiffViewMode.Raw ? doc.DiffNonRawMode : DiffViewMode.Raw;
+        StateHasChanged();
+    }
+
+    private const string SvgHighlightedSource = """
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-file-text" viewBox="0 0 16 16">
+          <path d="M5 4a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1zm-.5 2.5A.5.5 0 0 1 5 6h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5M5 8a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1zm0 2a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1z"/>
+          <path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2zm10-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1"/>
+        </svg>
+        """;
+
+    private const string SvgRenderedMarkdown = """
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-file-richtext" viewBox="0 0 16 16">
+          <path d="M7 4.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0m-.861 1.542 1.33.886 1.854-1.855a.25.25 0 0 1 .289-.047l1.888.974V7.5a.5.5 0 0 1-.5.5H5a.5.5 0 0 1-.5-.5V7s1.54-1.274 1.639-1.208M5 9a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1zm0 2a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1z"/>
+          <path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2zm10-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1"/>
+        </svg>
+        """;
+
+    private const string SvgRawDiff = """
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-filetype-raw" viewBox="0 0 16 16">
+          <path fill-rule="evenodd" d="M14 4.5V14a2 2 0 0 1-2 2v-1a1 1 0 0 0 1-1V4.5h-2A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v9H2V2a2 2 0 0 1 2-2h5.5zM1.597 11.85H0v3.999h.782v-1.491h.71l.7 1.491h1.651l.313-1.028h1.336l.314 1.028h.84L5.31 11.85h-.925l-1.329 3.96-.783-1.572A1.18 1.18 0 0 0 3 13.116q0-.384-.167-.668a1.1 1.1 0 0 0-.478-.44 1.7 1.7 0 0 0-.758-.158m-.815 1.913v-1.292h.7a.74.74 0 0 1 .507.17q.194.17.194.49 0 .315-.194.474-.19.158-.518.158zm4.063-1.148.489 1.617H4.32l.49-1.617zm4.006.445-.74 2.789h-.73L6.326 11.85h.855l.601 2.903h.038l.706-2.903h.683l.706 2.903h.04l.596-2.903h.858l-1.055 3.999h-.73l-.74-2.789H8.85Z"/>
+        </svg>
+        """;
+
+    private const string SvgMarkdownDiff = """
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-filetype-md" viewBox="0 0 16 16">
+          <path fill-rule="evenodd" d="M14 4.5V14a2 2 0 0 1-2 2H9v-1h3a1 1 0 0 0 1-1V4.5h-2A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v9H2V2a2 2 0 0 1 2-2h5.5zM.706 13.189v2.66H0V11.85h.806l1.14 2.596h.026l1.14-2.596h.8v3.999h-.716v-2.66h-.038l-.946 2.159h-.516l-.952-2.16H.706Zm3.919 2.66V11.85h1.459q.609 0 1.005.234t.589.68q.195.445.196 1.075 0 .634-.196 1.084-.197.451-.595.689-.396.237-1 .237H4.626Zm1.353-3.354h-.562v2.707h.562q.279 0 .484-.082a.8.8 0 0 0 .334-.252 1.1 1.1 0 0 0 .196-.422q.067-.252.067-.592a2.1 2.1 0 0 0-.117-.753.9.9 0 0 0-.354-.454q-.238-.152-.61-.152"/>
+        </svg>
+        """;
+
+    private static string DiffStyleIcon(DiffViewMode currentMode) =>
+        currentMode == DiffViewMode.Rendered ? SvgHighlightedSource : SvgRenderedMarkdown;
+
+    private static string DiffStyleLabel(DiffViewMode currentMode) =>
+        currentMode == DiffViewMode.Rendered ? "Highlighted Source" : "Rendered Markdown";
+
+    private static string DiffRawIcon(DiffViewMode currentMode) =>
+        currentMode == DiffViewMode.Raw ? SvgMarkdownDiff : SvgRawDiff;
+
+    private static string DiffRawLabel(DiffViewMode currentMode) =>
+        currentMode == DiffViewMode.Raw ? "Markdown Diff" : "Raw Diff";
+
+    private async Task SaveDiff()
+    {
+        var doc = TabService.ActiveDocument;
+        if (doc is null || !doc.IsDiff) return;
+
+        var leftName = string.IsNullOrEmpty(doc.DiffLeftLabel) ? "left" : Path.GetFileNameWithoutExtension(doc.DiffLeftLabel);
+        var rightName = string.IsNullOrEmpty(doc.DiffRightLabel) ? "right" : Path.GetFileNameWithoutExtension(doc.DiffRightLabel);
+        var fileName = $"{leftName}_vs_{rightName}.diff";
+
+        try
+        {
+            var bytes = System.Text.Encoding.UTF8.GetBytes(doc.Content);
+
+            if (AppMode.IsServiceMode)
+            {
+                // Streamed (not passed as a single JS-interop string argument) so large diffs
+                // don't exceed Blazor Server's SignalR message size limit and disconnect the circuit.
+                using var streamRef = new DotNetStreamReference(new MemoryStream(bytes));
+                await JS.InvokeVoidAsync("appInterop.downloadFileFromStream", fileName, streamRef);
+                return;
+            }
+
+            using var stream = new MemoryStream(bytes);
+            await FileSaver.Default.SaveAsync(fileName, stream, default);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Save diff error: {ex.Message}");
+        }
+    }
 
     private async Task ScrollToHeading(string id)
     {

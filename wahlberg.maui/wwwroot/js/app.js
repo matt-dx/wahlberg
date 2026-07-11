@@ -63,6 +63,29 @@ window.appInterop = {
         await this._renderMermaid();
     },
 
+    // Takes a .NET DotNetStreamReference instead of an inline string, so large diffs don't
+    // ride over a single Blazor Server SignalR message (which has a default size limit and
+    // can disconnect the circuit) — the .NET-to-JS transfer itself is chunked, even though
+    // arrayBuffer() below buffers the full result into memory on the JS side afterward.
+    downloadFileFromStream: async function (fileName, contentStreamReference) {
+        const arrayBuffer = await contentStreamReference.arrayBuffer();
+        const blob = new Blob([arrayBuffer], { type: 'text/plain' });
+        this._triggerDownload(fileName, blob);
+    },
+
+    _triggerDownload: function (fileName, blob) {
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = fileName;
+        anchor.style.display = 'none';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        // Some browsers cancel the download if the blob URL is revoked immediately.
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    },
+
     scrollToHeading: function (id) {
         const el = document.getElementById(id);
         if (el) {

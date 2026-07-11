@@ -22,6 +22,14 @@ public partial class App : MauiWinUIApplication
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        if (TryGetServePort(out var port))
+        {
+            AppMode.IsServiceMode = true;
+            ServiceHost.RunAsync(port).GetAwaiter().GetResult();
+            Environment.Exit(0);
+            return;
+        }
+
         _instanceMutex = new Mutex(true, $"{MutexName}_{Environment.UserName}", out bool isFirstInstance);
 
         if (!isFirstInstance)
@@ -40,6 +48,23 @@ public partial class App : MauiWinUIApplication
 
         var startupFile = GetLaunchFilePath();
         if (startupFile != null) FileOpenRequest.Raise(startupFile);
+    }
+
+    private const int DefaultServePort = 5230;
+
+    private static bool TryGetServePort(out int port)
+    {
+        port = DefaultServePort;
+        var args = Environment.GetCommandLineArgs();
+        var serveIndex = Array.IndexOf(args, "--serve");
+        if (serveIndex < 0) return false;
+
+        var portIndex = Array.IndexOf(args, "--port");
+        if (portIndex >= 0 && portIndex + 1 < args.Length &&
+            int.TryParse(args[portIndex + 1], out var parsed) && parsed is > 0 and <= 65535)
+            port = parsed;
+
+        return true;
     }
 
     private static string? GetLaunchFilePath()

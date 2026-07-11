@@ -18,6 +18,17 @@ public partial class TabService
     public MarkdownDocument? ActiveDocument { get; private set; }
     public TabOrientation Orientation { get; set; } = TabOrientation.Horizontal;
 
+    // Tracked separately so switching to a diff tab (which isn't persisted) doesn't
+    // clobber the ActiveFile session restores to on next launch.
+    private string? _lastActiveRealFile;
+
+    private void SetActive(MarkdownDocument? doc)
+    {
+        ActiveDocument = doc;
+        if (doc is { IsDiff: false })
+            _lastActiveRealFile = doc.FilePath;
+    }
+
     public event Action? StateChanged;
 
     public async Task RestoreSessionAsync()
@@ -45,7 +56,7 @@ public partial class TabService
                 var active = OpenDocuments.FirstOrDefault(d => d.FilePath == session.ActiveFile);
                 if (active is not null)
                 {
-                    ActiveDocument = active;
+                    SetActive(active);
                     StateChanged?.Invoke();
                 }
             }
@@ -61,7 +72,7 @@ public partial class TabService
         var existing = OpenDocuments.FirstOrDefault(d => d.FilePath == filePath);
         if (existing is not null)
         {
-            ActiveDocument = existing;
+            SetActive(existing);
             StateChanged?.Invoke();
             return;
         }
@@ -74,7 +85,7 @@ public partial class TabService
         };
 
         OpenDocuments.Add(doc);
-        ActiveDocument = doc;
+        SetActive(doc);
         StateChanged?.Invoke();
 
         var (html, headings) = await Task.Run(() =>
@@ -95,9 +106,46 @@ public partial class TabService
             _ = SaveSessionAsync();
     }
 
+    public void AddDiffDocument(
+        MarkdownDocument left, MarkdownDocument right,
+        string unifiedHtml, string sideBySideHtml,
+        string renderedUnifiedHtml, string renderedSideBySideHtml,
+        string unifiedText)
+    {
+        var title = $"{left.FileName} ↔ {right.FileName}";
+        var existing = OpenDocuments.FirstOrDefault(d =>
+            d.IsDiff && d.DiffLeftPath == left.FilePath && d.DiffRightPath == right.FilePath);
+        if (existing is not null)
+        {
+            SetActive(existing);
+            StateChanged?.Invoke();
+            return;
+        }
+
+        var doc = new MarkdownDocument
+        {
+            FilePath = title,
+            Content = unifiedText,
+            IsDiff = true,
+            DiffLeftLabel = left.FileName,
+            DiffRightLabel = right.FileName,
+            DiffLeftPath = left.FilePath,
+            DiffRightPath = right.FilePath,
+            DiffUnifiedHtml = unifiedHtml,
+            DiffSideBySideHtml = sideBySideHtml,
+            DiffRenderedUnifiedHtml = renderedUnifiedHtml,
+            DiffRenderedSideBySideHtml = renderedSideBySideHtml,
+            IsLoading = false
+        };
+
+        OpenDocuments.Add(doc);
+        SetActive(doc);
+        StateChanged?.Invoke();
+    }
+
     public void SetActiveDocument(MarkdownDocument doc)
     {
-        ActiveDocument = doc;
+        SetActive(doc);
         StateChanged?.Invoke();
         _ = SaveSessionAsync();
     }
@@ -109,9 +157,9 @@ public partial class TabService
 
         if (ActiveDocument == doc)
         {
-            ActiveDocument = OpenDocuments.Count > 0
+            SetActive(OpenDocuments.Count > 0
                 ? OpenDocuments[Math.Min(index, OpenDocuments.Count - 1)]
-                : null;
+                : null);
         }
 
         StateChanged?.Invoke();
@@ -124,10 +172,20 @@ public partial class TabService
     {
         try
         {
+            var openRealFiles = OpenDocuments.Where(d => !d.IsDiff).Select(d => d.FilePath).ToList();
+
+            // Only trust the diff-tab fallback if that file is still actually open — it can go
+            // stale if the real document behind it was closed while a diff tab stayed active.
+            var activeFile = ActiveDocument is { IsDiff: false }
+                ? ActiveDocument.FilePath
+                : _lastActiveRealFile is not null && openRealFiles.Contains(_lastActiveRealFile)
+                    ? _lastActiveRealFile
+                    : null;
+
             var session = new SessionState
             {
-                OpenFiles = OpenDocuments.Select(d => d.FilePath).ToList(),
-                ActiveFile = ActiveDocument?.FilePath
+                OpenFiles = openRealFiles,
+                ActiveFile = activeFile
             };
             var json = JsonSerializer.Serialize(session);
             await File.WriteAllTextAsync(_sessionPath, json);
@@ -174,7 +232,7 @@ public partial class TabService
     /// <summary>
     /// Rewrites relative image src paths to virtual-host URLs that WebView2 can resolve to local files.
     /// </summary>
-    private static string ResolveLocalPaths(string html, string documentDirectory)
+    internal static string ResolveLocalPaths(string html, string documentDirectory)
     {
         return ImgSrcRegex().Replace(html, match =>
         {
