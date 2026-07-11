@@ -294,6 +294,25 @@ body.drag-over::after {
     flex-shrink: 0;
 }
 
+/* .btn-primary/.btn-secondary default padding/width/margin are tuned for vertically-stacked
+   panel buttons (Settings/Export) — override to a fixed height here so the icon-only toggles
+   and the text+icon Save Diff button line up in this horizontal toolbar row. */
+.diff-toolbar-actions .btn-secondary,
+.diff-toolbar-actions .btn-primary {
+    width: auto;
+    height: 30px;
+    margin-top: 0;
+    padding: 0 12px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.diff-toolbar-actions svg {
+    display: block;
+}
+
 .diff-view {
     flex: 1;
     overflow: auto;
