@@ -28,7 +28,7 @@ public static class ServiceHost
 
         app.UseStaticFiles();
         app.UseAntiforgery();
-        app.MapRazorComponents<Components.WebHost.App>()
+        app.MapRazorComponents<Wahlberg.Components.WebHost.App>()
             .AddInteractiveServerRenderMode();
 
         app.Urls.Add($"http://localhost:{port}");
