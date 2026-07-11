@@ -13,6 +13,7 @@
 ## Service-mode UI differences
 
 Native-window-dependent features are hidden or replaced rather than left broken:
+
 - **Open** (`Home.razor`) and **Diff → Or Choose a File** (`DiffPickerPanel.razor`): a plain text file-path input replaces `FilePicker.Default.PickAsync`, which throws `InvalidOperationException` with no native window to associate the WinRT picker with.
 - **Save Diff**: triggers a client-side download via a new `appInterop.downloadTextFile` JS helper (Blob + synthetic anchor click) instead of `FileSaver.Default.SaveAsync`.
 - **Export button**: hidden entirely (PDF/Mermaid export depends on `HiddenWebView`, which itself depends on a native window — see the follow-up item below).
