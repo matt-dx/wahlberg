@@ -1,0 +1,13 @@
+10.0.9
+
+This file is vendored (see docs/as.is/service-mode.md, "Non-obvious behavior / gotchas"
+section) rather than served by ASP.NET Core's static-web-assets pipeline. It is tied to
+the Microsoft.AspNetCore.App version above and can drift out of sync with whatever
+version is actually resolved for the `Microsoft.AspNetCore.App` FrameworkReference at
+build/run time on a given machine.
+
+To refresh after upgrading the ASP.NET Core shared framework:
+  1. Find the matching version under
+     %userprofile%\.nuget\packages\microsoft.aspnetcore.app.internal.assets\<version>\_framework\blazor.web.js
+  2. Copy it over wahlberg.maui/wwwroot/_framework/blazor.web.js
+  3. Update the version number in this file

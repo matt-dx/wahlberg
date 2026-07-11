@@ -224,7 +224,7 @@ public class DiffService
             renderer.Render(block);
             var html = writer.ToString();
 
-            if (!string.IsNullOrEmpty(baseDir))
+            if (!string.IsNullOrEmpty(baseDir) && !AppMode.IsServiceMode)
                 html = TabService.ResolveLocalPaths(html, baseDir);
 
             result.Add((signature, html));

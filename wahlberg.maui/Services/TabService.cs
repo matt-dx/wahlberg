@@ -18,6 +18,17 @@ public partial class TabService
     public MarkdownDocument? ActiveDocument { get; private set; }
     public TabOrientation Orientation { get; set; } = TabOrientation.Horizontal;
 
+    // Tracked separately so switching to a diff tab (which isn't persisted) doesn't
+    // clobber the ActiveFile session restores to on next launch.
+    private string? _lastActiveRealFile;
+
+    private void SetActive(MarkdownDocument? doc)
+    {
+        ActiveDocument = doc;
+        if (doc is { IsDiff: false })
+            _lastActiveRealFile = doc.FilePath;
+    }
+
     public event Action? StateChanged;
 
     public async Task RestoreSessionAsync()
@@ -45,7 +56,7 @@ public partial class TabService
                 var active = OpenDocuments.FirstOrDefault(d => d.FilePath == session.ActiveFile);
                 if (active is not null)
                 {
-                    ActiveDocument = active;
+                    SetActive(active);
                     StateChanged?.Invoke();
                 }
             }
@@ -61,7 +72,7 @@ public partial class TabService
         var existing = OpenDocuments.FirstOrDefault(d => d.FilePath == filePath);
         if (existing is not null)
         {
-            ActiveDocument = existing;
+            SetActive(existing);
             StateChanged?.Invoke();
             return;
         }
@@ -74,7 +85,7 @@ public partial class TabService
         };
 
         OpenDocuments.Add(doc);
-        ActiveDocument = doc;
+        SetActive(doc);
         StateChanged?.Invoke();
 
         var (html, headings) = await Task.Run(() =>
@@ -105,7 +116,7 @@ public partial class TabService
         var existing = OpenDocuments.FirstOrDefault(d => d.IsDiff && d.FilePath == title);
         if (existing is not null)
         {
-            ActiveDocument = existing;
+            SetActive(existing);
             StateChanged?.Invoke();
             return;
         }
@@ -125,13 +136,13 @@ public partial class TabService
         };
 
         OpenDocuments.Add(doc);
-        ActiveDocument = doc;
+        SetActive(doc);
         StateChanged?.Invoke();
     }
 
     public void SetActiveDocument(MarkdownDocument doc)
     {
-        ActiveDocument = doc;
+        SetActive(doc);
         StateChanged?.Invoke();
         _ = SaveSessionAsync();
     }
@@ -143,9 +154,9 @@ public partial class TabService
 
         if (ActiveDocument == doc)
         {
-            ActiveDocument = OpenDocuments.Count > 0
+            SetActive(OpenDocuments.Count > 0
                 ? OpenDocuments[Math.Min(index, OpenDocuments.Count - 1)]
-                : null;
+                : null);
         }
 
         StateChanged?.Invoke();
@@ -161,7 +172,7 @@ public partial class TabService
             var session = new SessionState
             {
                 OpenFiles = OpenDocuments.Where(d => !d.IsDiff).Select(d => d.FilePath).ToList(),
-                ActiveFile = ActiveDocument is { IsDiff: false } ? ActiveDocument.FilePath : null
+                ActiveFile = ActiveDocument is { IsDiff: false } ? ActiveDocument.FilePath : _lastActiveRealFile
             };
             var json = JsonSerializer.Serialize(session);
             await File.WriteAllTextAsync(_sessionPath, json);

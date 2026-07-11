@@ -6,5 +6,5 @@
 
 ## Done
 
-- [x] Diff comparison view (unified + side-by-side, with the side-by-side color fix, icon-only layout toggle, Rendered/Plain-text toggle) — `docs/as.is/diff-view.md`
+- [x] Diff comparison view (unified + side-by-side, with the side-by-side color fix, icon-only layout toggle, and Rendered/Highlighted/Raw content modes) — `docs/as.is/diff-view.md`
 - [x] Web-service mode (`--serve [--port N]`), MVP slice — `docs/as.is/service-mode.md`
