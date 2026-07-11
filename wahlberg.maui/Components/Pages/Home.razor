@@ -98,8 +98,9 @@
                         <div class="diff-toolbar">
                             <span class="diff-title">@TabService.ActiveDocument.DiffLeftLabel ↔ @TabService.ActiveDocument.DiffRightLabel</span>
                             <div class="diff-toolbar-actions">
-                                <button class="btn-secondary" @onclick="ToggleDiffLayout" title="Toggle layout">
-                                    <i class="bi bi-layout-split"></i> @(TabService.ActiveDocument.DiffShowSideBySide ? "Unified" : "Side-by-side")
+                                <button class="btn-secondary" @onclick="ToggleDiffLayout"
+                                        title="@(TabService.ActiveDocument.DiffShowSideBySide ? "Unified" : "Side-by-side")">
+                                    <i class="bi @(TabService.ActiveDocument.DiffShowSideBySide ? "bi-square" : "bi-layout-split")"></i>
                                 </button>
                                 <button class="btn-primary" @onclick="SaveDiff" title="Save diff">
                                     <i class="bi bi-floppy"></i> Save Diff

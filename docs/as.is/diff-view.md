@@ -8,6 +8,7 @@ Wahlberg can compare the active document against another open document or a pick
 - `wahlberg.maui/Services/TabService.cs` — `AddDiffDocument(...)` creates a "virtual" tab (`MarkdownDocument.IsDiff = true`) that isn't backed by a real file path and is excluded from `session.json` persistence.
 - `wahlberg.maui/Components/DiffPickerPanel.razor` — "Compare With" modal: pick another open document or browse for a file (which also opens it as its own tab).
 - `wahlberg.maui/Components/Pages/Home.razor` — Diff toolbar button (hidden unless the active tab is a real, non-diff document), diff tab rendering, unified/side-by-side toggle (`ToggleDiffLayout`, state stored per-tab on `MarkdownDocument.DiffShowSideBySide`), Save Diff button.
+- The layout toggle is icon-only (`bi-square` when the tooltip reads "Unified", `bi-layout-split` when it reads "Side-by-side") — the visible label was dropped in favor of a `title` tooltip to keep the diff toolbar compact.
 
 ## Non-obvious behavior
 
