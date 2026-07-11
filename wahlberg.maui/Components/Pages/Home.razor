@@ -379,8 +379,15 @@
         _pathInputValue = "";
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;
 
-        var content = await File.ReadAllTextAsync(path);
-        await TabService.AddDocumentAsync(path, content);
+        try
+        {
+            var content = await File.ReadAllTextAsync(path);
+            await TabService.AddDocumentAsync(path, content);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error opening file: {ex.Message}");
+        }
     }
 
     private async Task OnPathInputKeyDown(KeyboardEventArgs e)
@@ -476,8 +483,8 @@
         var doc = TabService.ActiveDocument;
         if (doc is null || !doc.IsDiff) return;
 
-        var leftName = Path.GetFileNameWithoutExtension(doc.DiffLeftLabel);
-        var rightName = Path.GetFileNameWithoutExtension(doc.DiffRightLabel);
+        var leftName = string.IsNullOrEmpty(doc.DiffLeftLabel) ? "left" : Path.GetFileNameWithoutExtension(doc.DiffLeftLabel);
+        var rightName = string.IsNullOrEmpty(doc.DiffRightLabel) ? "right" : Path.GetFileNameWithoutExtension(doc.DiffRightLabel);
         var fileName = $"{leftName}_vs_{rightName}.diff";
 
         try
