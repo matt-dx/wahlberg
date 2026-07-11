@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 
 namespace Wahlberg.WinUI;
 
@@ -20,6 +21,11 @@ public static class ServiceHost
             ContentRootPath = AppContext.BaseDirectory
         });
 
+        // UseUrls replaces the configured addresses outright, rather than app.Urls.Add (which
+        // appends to whatever's already configured, e.g. an ASPNETCORE_URLS env var) — so --serve
+        // only ever binds to the one requested localhost port.
+        builder.WebHost.UseUrls($"http://localhost:{port}");
+
         MauiProgram.RegisterSharedServices(builder.Services);
         builder.Services.AddRazorComponents()
             .AddInteractiveServerComponents();
@@ -30,8 +36,6 @@ public static class ServiceHost
         app.UseAntiforgery();
         app.MapRazorComponents<Wahlberg.Components.WebHost.App>()
             .AddInteractiveServerRenderMode();
-
-        app.Urls.Add($"http://localhost:{port}");
 
         await app.RunAsync();
     }
