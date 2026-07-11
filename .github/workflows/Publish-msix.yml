@@ -22,7 +22,13 @@ jobs:
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             VERSION=${GITHUB_REF#refs/tags/v}
           else
-            VERSION="0.0.$GITHUB_RUN_NUMBER"
+            git fetch --tags --force origin
+            LATEST_TAG=$(git tag -l 'v*.*.*' | sort -V | tail -1)
+            if [[ -z "$LATEST_TAG" ]]; then
+              echo "::error::No existing version tag found to use for a manual dispatch run"
+              exit 1
+            fi
+            VERSION=${LATEST_TAG#v}
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Publishing version $VERSION"
