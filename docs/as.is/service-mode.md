@@ -15,7 +15,7 @@
 Native-window-dependent features are hidden or replaced rather than left broken:
 
 - **Open** (`Home.razor`) and **Diff → Or Choose a File** (`DiffPickerPanel.razor`): a plain text file-path input replaces `FilePicker.Default.PickAsync`, which throws `InvalidOperationException` with no native window to associate the WinRT picker with.
-- **Save Diff**: triggers a client-side download via a new `appInterop.downloadTextFile` JS helper (Blob + synthetic anchor click) instead of `FileSaver.Default.SaveAsync`.
+- **Save Diff**: triggers a client-side download via a new `appInterop.downloadFileFromStream` JS helper (`DotNetStreamReference` read as an `arrayBuffer()`, then Blob + synthetic anchor click) instead of `FileSaver.Default.SaveAsync`. Streamed rather than passed as a single JS-interop string argument so large diffs don't exceed Blazor Server's SignalR message size limit.
 - **Export button**: hidden entirely (PDF/Mermaid export depends on `HiddenWebView`, which itself depends on a native window — see the follow-up item below).
 - **Settings → External Editor / theme import / theme export**: hidden (editor picker launches a local `.exe` path that's meaningless server-side; theme import/export use `FilePicker`/`FileSaver`).
 

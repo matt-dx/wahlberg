@@ -172,10 +172,20 @@ public partial class TabService
     {
         try
         {
+            var openRealFiles = OpenDocuments.Where(d => !d.IsDiff).Select(d => d.FilePath).ToList();
+
+            // Only trust the diff-tab fallback if that file is still actually open — it can go
+            // stale if the real document behind it was closed while a diff tab stayed active.
+            var activeFile = ActiveDocument is { IsDiff: false }
+                ? ActiveDocument.FilePath
+                : _lastActiveRealFile is not null && openRealFiles.Contains(_lastActiveRealFile)
+                    ? _lastActiveRealFile
+                    : null;
+
             var session = new SessionState
             {
-                OpenFiles = OpenDocuments.Where(d => !d.IsDiff).Select(d => d.FilePath).ToList(),
-                ActiveFile = ActiveDocument is { IsDiff: false } ? ActiveDocument.FilePath : _lastActiveRealFile
+                OpenFiles = openRealFiles,
+                ActiveFile = activeFile
             };
             var json = JsonSerializer.Serialize(session);
             await File.WriteAllTextAsync(_sessionPath, json);
