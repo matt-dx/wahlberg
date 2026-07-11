@@ -98,18 +98,32 @@
                         <div class="diff-toolbar">
                             <span class="diff-title">@TabService.ActiveDocument.DiffLeftLabel ↔ @TabService.ActiveDocument.DiffRightLabel</span>
                             <div class="diff-toolbar-actions">
-                                <button class="btn-secondary" @onclick="ToggleDiffLayout"
-                                        title="@(TabService.ActiveDocument.DiffShowSideBySide ? "Unified" : "Side-by-side")">
-                                    <i class="bi @(TabService.ActiveDocument.DiffShowSideBySide ? "bi-square" : "bi-layout-split")"></i>
+                                @if (!TabService.ActiveDocument.DiffShowPlainText)
+                                {
+                                    <button class="btn-secondary" @onclick="ToggleDiffLayout"
+                                            title="@(TabService.ActiveDocument.DiffShowSideBySide ? "Unified" : "Side-by-side")">
+                                        <i class="bi @(TabService.ActiveDocument.DiffShowSideBySide ? "bi-square" : "bi-layout-split")"></i>
+                                    </button>
+                                }
+                                <button class="btn-secondary" @onclick="ToggleDiffPlainText"
+                                        title="@(TabService.ActiveDocument.DiffShowPlainText ? "Rendered" : "Plain text")">
+                                    <i class="bi @(TabService.ActiveDocument.DiffShowPlainText ? "bi-file-richtext" : "bi-code-slash")"></i>
                                 </button>
                                 <button class="btn-primary" @onclick="SaveDiff" title="Save diff">
                                     <i class="bi bi-floppy"></i> Save Diff
                                 </button>
                             </div>
                         </div>
-                        <div class="diff-view">
-                            @((MarkupString)(TabService.ActiveDocument.DiffShowSideBySide ? TabService.ActiveDocument.DiffSideBySideHtml : TabService.ActiveDocument.DiffUnifiedHtml))
-                        </div>
+                        @if (TabService.ActiveDocument.DiffShowPlainText)
+                        {
+                            <pre class="diff-plain-text">@TabService.ActiveDocument.Content</pre>
+                        }
+                        else
+                        {
+                            <div class="diff-view">
+                                @((MarkupString)(TabService.ActiveDocument.DiffShowSideBySide ? TabService.ActiveDocument.DiffSideBySideHtml : TabService.ActiveDocument.DiffUnifiedHtml))
+                            </div>
+                        }
                     </div>
                 }
                 else if (TabService.ActiveDocument.IsLoading)
@@ -373,6 +387,14 @@
         var doc = TabService.ActiveDocument;
         if (doc is null || !doc.IsDiff) return;
         doc.DiffShowSideBySide = !doc.DiffShowSideBySide;
+        StateHasChanged();
+    }
+
+    private void ToggleDiffPlainText()
+    {
+        var doc = TabService.ActiveDocument;
+        if (doc is null || !doc.IsDiff) return;
+        doc.DiffShowPlainText = !doc.DiffShowPlainText;
         StateHasChanged();
     }
 

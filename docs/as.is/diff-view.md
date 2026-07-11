@@ -9,6 +9,7 @@ Wahlberg can compare the active document against another open document or a pick
 - `wahlberg.maui/Components/DiffPickerPanel.razor` — "Compare With" modal: pick another open document or browse for a file (which also opens it as its own tab).
 - `wahlberg.maui/Components/Pages/Home.razor` — Diff toolbar button (hidden unless the active tab is a real, non-diff document), diff tab rendering, unified/side-by-side toggle (`ToggleDiffLayout`, state stored per-tab on `MarkdownDocument.DiffShowSideBySide`), Save Diff button.
 - The layout toggle is icon-only (`bi-square` when the tooltip reads "Unified", `bi-layout-split` when it reads "Side-by-side") — the visible label was dropped in favor of a `title` tooltip to keep the diff toolbar compact.
+- A second icon-only toggle (`ToggleDiffPlainText`, `MarkdownDocument.DiffShowPlainText`) switches between the rendered colored view and the raw unified-diff text (the same `Content` already generated for Save Diff), shown in a `<pre class="diff-plain-text">`. The layout toggle is hidden while plain-text mode is active, since layout has no meaning for raw text.
 
 ## Non-obvious behavior
 

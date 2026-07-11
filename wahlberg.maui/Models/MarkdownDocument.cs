@@ -16,4 +16,5 @@ public class MarkdownDocument
     public string DiffUnifiedHtml { get; init; } = string.Empty;
     public string DiffSideBySideHtml { get; init; } = string.Empty;
     public bool DiffShowSideBySide { get; set; }
+    public bool DiffShowPlainText { get; set; }
 }
