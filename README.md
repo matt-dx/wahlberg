@@ -10,6 +10,7 @@ A cross-platform Markdown viewer built with .NET MAUI and Blazor.
 - **Session restore** — reopens your previously open files on next launch
 - **Drag and drop** — drop a Markdown file onto the window to open it
 - **Local image support** — relative image paths in documents resolve to local files
+- **Web service mode** (Windows) — run headless with `--serve [--port N]` to drive the app through a browser instead of the native window
 
 ## Supported Platforms
 
@@ -64,6 +65,14 @@ dotnet run --project wahlberg.maui -f net10.0-android
 ```
 
 Or open `Wahlberg.slnx` in Visual Studio and press **F5**.
+
+### Run as a Web Service (Windows)
+
+```bash
+Wahlberg.exe --serve --port 5230
+```
+
+Hosts the same UI over Kestrel/Blazor Server at `http://localhost:5230` instead of opening the native window — no native window is created, so it can run alongside an already-open windowed instance. `--port` is optional (defaults to `5230`). See `docs/as.is/service-mode.md` for details and known limitations (PDF/Mermaid export and some file pickers aren't available in this mode yet).
 
 ## Project Structure
 

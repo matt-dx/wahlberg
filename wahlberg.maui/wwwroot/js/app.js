@@ -63,6 +63,18 @@ window.appInterop = {
         await this._renderMermaid();
     },
 
+    downloadTextFile: function (fileName, content) {
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = fileName;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(url);
+    },
+
     scrollToHeading: function (id) {
         const el = document.getElementById(id);
         if (el) {

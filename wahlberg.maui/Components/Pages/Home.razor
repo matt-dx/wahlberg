@@ -19,9 +19,12 @@
                 <i class="@(editorIcon)"></i> Edit
             </button>
         }
-        <button class="toolbar-btn" @onclick="ToggleExport" title="Export">
-            <i class="bi bi-box-arrow-up"></i> Export
-        </button>
+        @if (!AppMode.IsServiceMode)
+        {
+            <button class="toolbar-btn" @onclick="ToggleExport" title="Export">
+                <i class="bi bi-box-arrow-up"></i> Export
+            </button>
+        }
         <button class="toolbar-btn" @onclick="ToggleDiff" title="Diff">
             <i class="bi bi-file-diff"></i> Diff
         </button>
@@ -31,6 +34,16 @@
         <i class="bi bi-gear"></i>
     </button>
 </div>
+
+@if (_showPathInput)
+{
+    <div class="path-input-bar">
+        <input @bind="_pathInputValue" @bind:event="oninput" @onkeydown="OnPathInputKeyDown"
+               placeholder="Enter full file path…" class="text-input" autofocus />
+        <button class="btn-primary" @onclick="SubmitPathInput">Open</button>
+        <button class="btn-secondary" @onclick="() => _showPathInput = false">Cancel</button>
+    </div>
+}
 
 <div class="workspace @(TabService.Orientation == TabOrientation.Vertical ? "vertical" : "horizontal")">
     @if (TabService.OpenDocuments.Count > 0)
@@ -277,8 +290,17 @@
         _ = TabService.AddDocumentAsync(fileName, content);
     }
 
+    private bool _showPathInput;
+    private string _pathInputValue = "";
+
     private async Task OpenFile()
     {
+        if (AppMode.IsServiceMode)
+        {
+            _showPathInput = true;
+            return;
+        }
+
         try
         {
             var customFileType = new FilePickerFileType(
@@ -307,6 +329,22 @@
         {
             System.Diagnostics.Debug.WriteLine($"Error opening file: {ex.Message}");
         }
+    }
+
+    private async Task SubmitPathInput()
+    {
+        var path = _pathInputValue.Trim();
+        _showPathInput = false;
+        _pathInputValue = "";
+        if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;
+
+        var content = await File.ReadAllTextAsync(path);
+        await TabService.AddDocumentAsync(path, content);
+    }
+
+    private async Task OnPathInputKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await SubmitPathInput();
     }
 
     private void CloseTab(MarkdownDocument doc)
@@ -342,13 +380,21 @@
         var doc = TabService.ActiveDocument;
         if (doc is null || !doc.IsDiff) return;
 
+        var leftName = Path.GetFileNameWithoutExtension(doc.DiffLeftLabel);
+        var rightName = Path.GetFileNameWithoutExtension(doc.DiffRightLabel);
+        var fileName = $"{leftName}_vs_{rightName}.diff";
+
         try
         {
-            var leftName = Path.GetFileNameWithoutExtension(doc.DiffLeftLabel);
-            var rightName = Path.GetFileNameWithoutExtension(doc.DiffRightLabel);
+            if (AppMode.IsServiceMode)
+            {
+                await JS.InvokeVoidAsync("appInterop.downloadTextFile", fileName, doc.Content);
+                return;
+            }
+
             var bytes = System.Text.Encoding.UTF8.GetBytes(doc.Content);
             using var stream = new MemoryStream(bytes);
-            await FileSaver.Default.SaveAsync($"{leftName}_vs_{rightName}.diff", stream, default);
+            await FileSaver.Default.SaveAsync(fileName, stream, default);
         }
         catch (Exception ex)
         {

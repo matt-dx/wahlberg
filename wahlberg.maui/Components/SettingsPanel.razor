@@ -24,7 +24,7 @@
                 </div>
             </section>
 
-            @if (IsDesktopPlatform)
+            @if (IsDesktopPlatform && !AppMode.IsServiceMode)
             {
                 <!-- External Editor -->
                 <section class="settings-section">
@@ -66,8 +66,11 @@
                 </div>
                 <div class="theme-actions">
                     <button class="btn-secondary" @onclick="CreateNewTheme">+ New</button>
-                    <button class="btn-secondary" @onclick="ImportTheme"><i class="bi bi-box-arrow-in-down"></i> Import</button>
-                    <button class="btn-secondary" @onclick="ExportTheme"><i class="bi bi-box-arrow-up"></i> Export</button>
+                    @if (!AppMode.IsServiceMode)
+                    {
+                        <button class="btn-secondary" @onclick="ImportTheme"><i class="bi bi-box-arrow-in-down"></i> Import</button>
+                        <button class="btn-secondary" @onclick="ExportTheme"><i class="bi bi-box-arrow-up"></i> Export</button>
+                    }
                 </div>
             </section>
 

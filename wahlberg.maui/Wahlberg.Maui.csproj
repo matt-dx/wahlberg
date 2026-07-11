@@ -82,4 +82,11 @@
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
     </ItemGroup>
 
+    <!-- Windows-only: lets Wahlberg.exe run in "serve" mode, hosting the existing Blazor UI
+         over Kestrel/Blazor Server instead of the native WinUI window. Not available on
+         Android/iOS/MacCatalyst (no Microsoft.AspNetCore.App shared framework on-device). -->
+    <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    </ItemGroup>
+
 </Project>

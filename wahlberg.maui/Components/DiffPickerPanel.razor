@@ -34,10 +34,18 @@
 
             <section class="settings-section">
                 <h4>Or Choose a File</h4>
-                <div class="export-cover-picker">
-                    <button class="btn-secondary" @onclick="BrowseForFile">Browse…</button>
-                    <span>@(string.IsNullOrEmpty(_browsedPath) ? "No file selected" : Path.GetFileName(_browsedPath))</span>
-                </div>
+                @if (AppMode.IsServiceMode)
+                {
+                    <input type="text" class="text-input" placeholder="Enter full file path…"
+                           value="@_browsedPath" @oninput="OnPathTyped" />
+                }
+                else
+                {
+                    <div class="export-cover-picker">
+                        <button class="btn-secondary" @onclick="BrowseForFile">Browse…</button>
+                        <span>@(string.IsNullOrEmpty(_browsedPath) ? "No file selected" : Path.GetFileName(_browsedPath))</span>
+                    </div>
+                }
             </section>
 
             @if (!string.IsNullOrEmpty(_errorMessage))
@@ -78,6 +86,12 @@
     {
         _selectedOpenDoc = doc;
         _browsedPath = null;
+    }
+
+    private void OnPathTyped(ChangeEventArgs e)
+    {
+        _browsedPath = e.Value?.ToString();
+        _selectedOpenDoc = null;
     }
 
     private async Task BrowseForFile()

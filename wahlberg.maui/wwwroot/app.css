@@ -424,6 +424,20 @@ body.drag-over::after {
     font-size: 16px;
 }
 
+/* ===== Path input bar (service-mode Open fallback, no native FilePicker) ===== */
+.path-input-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--theme-surface);
+    border-bottom: 1px solid var(--theme-border);
+}
+
+.path-input-bar .text-input {
+    flex: 1;
+}
+
 /* ===== Workspace ===== */
 .workspace {
     flex: 1;

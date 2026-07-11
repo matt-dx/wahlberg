@@ -1,0 +1,13 @@
+# Service mode: PDF/Mermaid export and native-parity file pickers
+
+Follow-up to the `--serve` web-service mode MVP (see `docs/as.is/service-mode.md`). Deliberately deferred out of that run's scope to keep it reviewable.
+
+## What's deferred
+
+1. **PDF/Mermaid export** (`ExportPanel.razor` → `ExportService`, `Platforms/Windows/PdfExporter.cs`) is currently hidden entirely when `AppMode.IsServiceMode` is true. It depends on `Platforms/Windows/HiddenWebView.cs`, which creates and immediately hides a native WinUI `Window`/WebView2 to render Mermaid diagrams for the PDF. Real, confirmed risk that this doesn't work at all in a process that never creates any MAUI `Window` (dotnet/maui issue #5671: `MainThread.BeginInvokeOnMainThread` breaks if no window has ever existed). Needs investigation: does `HiddenWebView` work if invoked from a `--serve`-mode process, or does it need its own dedicated fix (e.g., a headless Chromium-based Mermaid renderer instead)?
+2. **Cover-image picker** (`ExportPanel.PickCoverImage`) — moot while Export is hidden entirely, but would need the same text-input-path fallback pattern used for Open/Diff's file picker if Export is ever enabled in service mode.
+3. **Settings → editor picker / theme import / theme export** (`SettingsPanel.PickEditor`/`ImportTheme`/`ExportTheme`) — currently hidden in service mode. Editor picking is arguably not meaningful server-side at all (launches a local `.exe`, which only makes sense on the machine running the browser, not necessarily the machine running the server). Theme import/export could get the same path-input/download fallback treatment as Open/Save Diff already have.
+
+## Also worth checking
+
+- **Click/interactivity reliability**: manual testing during the MVP run showed the Blazor Server circuit disconnecting and reconnecting roughly every 30 seconds when accessed through an automated browser-testing tool, with clicks near that boundary not registering. This looked like a testing-tool/proxy limitation (SignalR's default client-side keep-alive timeout, suggesting server keep-alive pings weren't reaching the client through that specific tool's tunnel) rather than a server misconfiguration — no custom SignalR/Hub options were changed. **Not independently confirmed working in a real desktop browser.** Do a quick manual check (launch `--serve`, open `http://localhost:5230` in a normal browser, click around) before building further on top of service mode — if the disconnect/reconnect cycle reproduces there too, that's a real bug to chase (likely `HubOptions.KeepAliveInterval`/`ClientTimeoutInterval` needing explicit configuration).
