@@ -239,6 +239,9 @@ public class DiffService
     {
         var oldJoined = string.Join(BlockDelimiter, leftBlocks.Select(b => b.Signature));
         var newJoined = string.Join(BlockDelimiter, rightBlocks.Select(b => b.Signature));
-        return new Differ().CreateCustomDiffs(oldJoined, newJoined, false, text => text.Split(BlockDelimiter));
+        // text.Split on an empty string yields [""] (one token), which would desync from an
+        // empty block list (zero blocks) and cause out-of-range indexing when rendering.
+        return new Differ().CreateCustomDiffs(oldJoined, newJoined, false,
+            text => text.Length == 0 ? [] : text.Split(BlockDelimiter));
     }
 }
