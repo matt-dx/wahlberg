@@ -6,13 +6,17 @@ using Wahlberg.Models;
 
 namespace Wahlberg.Services;
 
-public partial class TabService
+public partial class TabService : IDisposable
 {
     private readonly MarkdownPipeline _pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
         .Build();
 
     private readonly string _sessionPath = Path.Combine(FileSystem.AppDataDirectory, "session.json");
+
+    private static readonly TimeSpan ReloadDebounce = TimeSpan.FromMilliseconds(400);
+    private readonly Dictionary<string, FileSystemWatcher> _watchers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, CancellationTokenSource> _pendingReloads = new(StringComparer.OrdinalIgnoreCase);
 
     public List<MarkdownDocument> OpenDocuments { get; } = [];
     public MarkdownDocument? ActiveDocument { get; private set; }
@@ -87,6 +91,7 @@ public partial class TabService
         OpenDocuments.Add(doc);
         SetActive(doc);
         StateChanged?.Invoke();
+        WatchFile(filePath);
 
         var (html, headings) = await Task.Run(() =>
         {
@@ -155,6 +160,9 @@ public partial class TabService
         var index = OpenDocuments.IndexOf(doc);
         OpenDocuments.Remove(doc);
 
+        if (!doc.IsDiff)
+            UnwatchFile(doc.FilePath);
+
         if (ActiveDocument == doc)
         {
             SetActive(OpenDocuments.Count > 0
@@ -167,6 +175,166 @@ public partial class TabService
     }
 
     public void NotifyStateChanged() => StateChanged?.Invoke();
+
+    /// <summary>
+    /// Watches a real (non-diff) document's backing file so external edits are picked up
+    /// and reloaded automatically. Best-effort — failures (e.g. unsupported path) are ignored.
+    /// </summary>
+    private void WatchFile(string filePath)
+    {
+        if (_watchers.ContainsKey(filePath)) return;
+
+        var dir = Path.GetDirectoryName(filePath);
+        var name = Path.GetFileName(filePath);
+        if (string.IsNullOrEmpty(dir) || string.IsNullOrEmpty(name) || !Directory.Exists(dir)) return;
+
+        try
+        {
+            var watcher = new FileSystemWatcher(dir, name)
+            {
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName
+            };
+            watcher.Changed += (_, _) => ScheduleReload(filePath);
+            watcher.Created += (_, _) => ScheduleReload(filePath);
+            watcher.Renamed += (_, _) => ScheduleReload(filePath);
+            watcher.EnableRaisingEvents = true;
+            _watchers[filePath] = watcher;
+        }
+        catch
+        {
+            // Watching is best-effort; the file just won't auto-reload.
+        }
+    }
+
+    private void UnwatchFile(string filePath)
+    {
+        if (_watchers.Remove(filePath, out var watcher))
+        {
+            watcher.EnableRaisingEvents = false;
+            watcher.Dispose();
+        }
+
+        lock (_pendingReloads)
+        {
+            if (_pendingReloads.Remove(filePath, out var cts))
+            {
+                cts.Cancel();
+                cts.Dispose();
+            }
+        }
+    }
+
+    /// <summary>Debounces bursts of filesystem events (editors often fire several per save) before reloading.</summary>
+    private void ScheduleReload(string filePath)
+    {
+        CancellationTokenSource cts;
+        lock (_pendingReloads)
+        {
+            if (_pendingReloads.TryGetValue(filePath, out var existing))
+            {
+                existing.Cancel();
+                existing.Dispose();
+            }
+
+            cts = new CancellationTokenSource();
+            _pendingReloads[filePath] = cts;
+        }
+
+        _ = DebouncedReloadAsync(filePath, cts.Token);
+    }
+
+    private async Task DebouncedReloadAsync(string filePath, CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(ReloadDebounce, token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        lock (_pendingReloads)
+        {
+            _pendingReloads.Remove(filePath);
+        }
+
+        await ReloadDocumentFromDiskAsync(filePath);
+    }
+
+    private async Task ReloadDocumentFromDiskAsync(string filePath)
+    {
+        var doc = OpenDocuments.FirstOrDefault(d => !d.IsDiff && d.FilePath == filePath);
+        if (doc is null) return;
+
+        string content;
+        try
+        {
+            content = await ReadWithRetryAsync(filePath);
+        }
+        catch (IOException)
+        {
+            return;
+        }
+
+        if (content == doc.Content) return;
+
+        var (html, headings) = await Task.Run(() =>
+        {
+            var rawHtml = Markdown.ToHtml(content, _pipeline);
+            var docDir = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(docDir))
+                rawHtml = ResolveLocalPaths(rawHtml, docDir);
+            return (rawHtml, ExtractHeadings(rawHtml));
+        });
+
+        doc.Content = content;
+        doc.HtmlContent = html;
+        doc.Headings = headings;
+        doc.ReloadVersion++;
+        StateChanged?.Invoke();
+    }
+
+    /// <summary>A save can briefly hold the file locked (e.g. temp-file-then-rename); retry a few times before giving up.</summary>
+    private static async Task<string> ReadWithRetryAsync(string filePath)
+    {
+        const int maxAttempts = 3;
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await File.ReadAllTextAsync(filePath);
+            }
+            catch (IOException) when (attempt < maxAttempts)
+            {
+                await Task.Delay(150);
+            }
+            catch (FileNotFoundException) when (attempt < maxAttempts)
+            {
+                await Task.Delay(150);
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        foreach (var watcher in _watchers.Values)
+        {
+            watcher.EnableRaisingEvents = false;
+            watcher.Dispose();
+        }
+        _watchers.Clear();
+
+        lock (_pendingReloads)
+        {
+            foreach (var cts in _pendingReloads.Values)
+            {
+                cts.Cancel();
+                cts.Dispose();
+            }
+            _pendingReloads.Clear();
+        }
+    }
 
     private async Task SaveSessionAsync()
     {

@@ -191,6 +191,7 @@
     private string _activeHeadingId = "";
     private DotNetObjectReference<Home>? _dotNetRef;
     private Guid? _lastProcessedDocId;
+    private int _lastProcessedReloadVersion = -1;
     private DiffViewMode? _lastProcessedDiffMode;
     private bool? _lastProcessedDiffLayout;
 
@@ -254,7 +255,7 @@
         var doc = TabService.ActiveDocument;
         if (doc is not null && !doc.IsLoading)
         {
-            var isNewDoc = doc.Id != _lastProcessedDocId;
+            var isNewDoc = doc.Id != _lastProcessedDocId || doc.ReloadVersion != _lastProcessedReloadVersion;
             var isRenderedDiff = doc.IsDiff && doc.DiffMode == DiffViewMode.Rendered;
             var renderedDiffChanged = isRenderedDiff &&
                 (_lastProcessedDiffMode != DiffViewMode.Rendered || _lastProcessedDiffLayout != doc.DiffShowSideBySide);
@@ -270,6 +271,7 @@
             }
 
             _lastProcessedDocId = doc.Id;
+            _lastProcessedReloadVersion = doc.ReloadVersion;
             _lastProcessedDiffMode = doc.IsDiff ? doc.DiffMode : null;
             _lastProcessedDiffLayout = doc.IsDiff ? doc.DiffShowSideBySide : null;
         }
@@ -399,6 +401,7 @@
     {
         TabService.CloseDocument(doc);
         _lastProcessedDocId = null;
+        _lastProcessedReloadVersion = -1;
     }
 
     private void EditCurrentFile()
