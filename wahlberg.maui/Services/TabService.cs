@@ -256,9 +256,10 @@ public partial class TabService : IDisposable
         var name = Path.GetFileName(filePath);
         if (string.IsNullOrEmpty(dir) || string.IsNullOrEmpty(name) || !Directory.Exists(dir)) return;
 
+        FileSystemWatcher? watcher = null;
         try
         {
-            var watcher = new FileSystemWatcher(dir, name)
+            watcher = new FileSystemWatcher(dir, name)
             {
                 NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName
             };
@@ -279,7 +280,17 @@ public partial class TabService : IDisposable
         }
         catch
         {
-            // Watching is best-effort; the file just won't auto-reload.
+            // Watching is best-effort; the file just won't auto-reload. But make sure a
+            // partially-initialized watcher doesn't leak or linger in _watchers.
+            if (watcher is not null)
+            {
+                lock (_watcherStateLock)
+                {
+                    if (_watchers.TryGetValue(filePath, out var registered) && ReferenceEquals(registered, watcher))
+                        _watchers.Remove(filePath);
+                }
+                watcher.Dispose();
+            }
         }
     }
 
@@ -312,6 +323,11 @@ public partial class TabService : IDisposable
         int generation;
         lock (_watcherStateLock)
         {
+            // A queued watcher event can still fire after UnwatchFile/Dispose already ran
+            // (e.g. Dispose() unsubscribing races the last raised event) — ignore it rather
+            // than re-populating state for a file that's no longer watched/open.
+            if (!_watchers.ContainsKey(filePath)) return;
+
             // Cancel only — see the comment in UnwatchFile about not disposing here.
             if (_pendingReloads.TryGetValue(filePath, out var existing))
                 existing.Cancel();
@@ -375,6 +391,15 @@ public partial class TabService : IDisposable
             return;
         }
 
+        lock (_docsLock)
+        {
+            // FileSystemWatcher often fires more than once per save (and can fire even when
+            // content didn't change) — skip the expensive Markdig render entirely if nothing
+            // actually changed on disk.
+            if (!OpenDocuments.Contains(doc)) return;
+            if (content == doc.Content) return;
+        }
+
         var (html, headings) = await Task.Run(() =>
         {
             var rawHtml = Markdown.ToHtml(content, _pipeline);
@@ -394,7 +419,8 @@ public partial class TabService : IDisposable
 
         lock (_docsLock)
         {
-            // Re-check the doc is still open — it may have been closed while we were reloading.
+            // Re-check the doc is still open and content still differs — both may have
+            // changed while we were reloading.
             if (!OpenDocuments.Contains(doc)) return;
             if (content == doc.Content) return;
 
