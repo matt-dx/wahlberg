@@ -146,7 +146,7 @@
                 var path = _browsedPath!;
                 var content = await File.ReadAllTextAsync(path);
                 await TabService.AddDocumentAsync(path, content);
-                right = TabService.OpenDocuments.First(d => d.FilePath == path);
+                right = TabService.FindOpenDocument(path)!;
             }
 
             var leftDir = Path.GetDirectoryName(left.FilePath);

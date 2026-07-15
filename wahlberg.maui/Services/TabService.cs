@@ -55,6 +55,20 @@ public partial class TabService : IDisposable
     // the same platform-appropriate comparer as the _watchers/_pendingReloads keys.
     private static bool PathsEqual(string? a, string? b) => PathComparer.Equals(a, b);
 
+    /// <summary>
+    /// Looks up an open (non-diff) document by path using the same platform-appropriate
+    /// comparer as AddDocumentAsync's own dedup check — callers should use this instead of
+    /// exact string equality against FilePath, which can miss a match that differs only by
+    /// case on case-insensitive platforms.
+    /// </summary>
+    public MarkdownDocument? FindOpenDocument(string filePath)
+    {
+        lock (_docsLock)
+        {
+            return OpenDocuments.FirstOrDefault(d => !d.IsDiff && PathsEqual(d.FilePath, filePath));
+        }
+    }
+
     private void SetActive(MarkdownDocument? doc)
     {
         ActiveDocument = doc;
