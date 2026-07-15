@@ -42,6 +42,10 @@ public partial class TabService : IDisposable
     // clobber the ActiveFile session restores to on next launch.
     private string? _lastActiveRealFile;
 
+    // Windows paths are case-insensitive; used everywhere a FilePath is compared so
+    // OpenDocuments dedup logic matches the case-insensitive _watchers/_pendingReloads keys.
+    private static bool PathsEqual(string? a, string? b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+
     private void SetActive(MarkdownDocument? doc)
     {
         ActiveDocument = doc;
@@ -76,7 +80,7 @@ public partial class TabService : IDisposable
                 bool activated;
                 lock (_docsLock)
                 {
-                    var active = OpenDocuments.FirstOrDefault(d => d.FilePath == session.ActiveFile);
+                    var active = OpenDocuments.FirstOrDefault(d => PathsEqual(d.FilePath, session.ActiveFile));
                     activated = active is not null;
                     if (active is not null)
                         SetActive(active);
@@ -97,7 +101,7 @@ public partial class TabService : IDisposable
         MarkdownDocument? doc = null;
         lock (_docsLock)
         {
-            existing = OpenDocuments.FirstOrDefault(d => d.FilePath == filePath);
+            existing = OpenDocuments.FirstOrDefault(d => PathsEqual(d.FilePath, filePath));
             if (existing is not null)
             {
                 SetActive(existing);
@@ -152,7 +156,7 @@ public partial class TabService : IDisposable
         lock (_docsLock)
         {
             var existing = OpenDocuments.FirstOrDefault(d =>
-                d.IsDiff && d.DiffLeftPath == left.FilePath && d.DiffRightPath == right.FilePath);
+                d.IsDiff && PathsEqual(d.DiffLeftPath, left.FilePath) && PathsEqual(d.DiffRightPath, right.FilePath));
             if (existing is not null)
             {
                 SetActive(existing);
@@ -334,7 +338,7 @@ public partial class TabService : IDisposable
         MarkdownDocument? doc;
         lock (_docsLock)
         {
-            doc = OpenDocuments.FirstOrDefault(d => !d.IsDiff && d.FilePath == filePath);
+            doc = OpenDocuments.FirstOrDefault(d => !d.IsDiff && PathsEqual(d.FilePath, filePath));
         }
         if (doc is null) return;
 
@@ -393,10 +397,8 @@ public partial class TabService : IDisposable
             }
             catch (IOException) when (attempt < maxAttempts)
             {
-                await Task.Delay(150);
-            }
-            catch (FileNotFoundException) when (attempt < maxAttempts)
-            {
+                // FileNotFoundException derives from IOException (a save can transiently
+                // delete-then-recreate the file), so this one catch covers both.
                 await Task.Delay(150);
             }
         }
@@ -435,7 +437,7 @@ public partial class TabService : IDisposable
                 // stale if the real document behind it was closed while a diff tab stayed active.
                 activeFile = ActiveDocument is { IsDiff: false }
                     ? ActiveDocument.FilePath
-                    : _lastActiveRealFile is not null && openRealFiles.Contains(_lastActiveRealFile)
+                    : _lastActiveRealFile is not null && openRealFiles.Any(f => PathsEqual(f, _lastActiveRealFile))
                         ? _lastActiveRealFile
                         : null;
             }
