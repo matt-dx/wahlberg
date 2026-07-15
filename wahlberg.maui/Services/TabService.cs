@@ -18,8 +18,20 @@ public partial class TabService : IDisposable
     private readonly Dictionary<string, FileSystemWatcher> _watchers = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, CancellationTokenSource> _pendingReloads = new(StringComparer.OrdinalIgnoreCase);
 
-    // Guards OpenDocuments (list mutations + lookups) since FileSystemWatcher callbacks run on
-    // ThreadPool threads and can otherwise race with UI-driven Add/Close calls.
+    // Bumped per file on every ScheduleReload call. ReloadDocumentFromDiskAsync stamps the
+    // generation it was scheduled with and, once its (possibly slow) read+render finishes,
+    // discards the result if a newer reload has since been scheduled for the same path — this
+    // stops two overlapping reloads (from two quick saves) from applying out of order.
+    private readonly Dictionary<string, int> _reloadGenerations = new(StringComparer.OrdinalIgnoreCase);
+
+    // Guards _watchers/_pendingReloads/_reloadGenerations, which FileSystemWatcher callbacks
+    // (ThreadPool threads) touch alongside WatchFile/UnwatchFile (UI-driven).
+    private readonly object _watcherStateLock = new();
+
+    // Guards OpenDocuments/ActiveDocument since FileSystemWatcher-driven reloads can otherwise
+    // race with UI-driven Add/Close/SetActive calls. Never held at the same time as
+    // _watcherStateLock — the two are always acquired one at a time, so lock ordering can't
+    // deadlock.
     private readonly object _docsLock = new();
 
     public List<MarkdownDocument> OpenDocuments { get; } = [];
@@ -61,12 +73,16 @@ public partial class TabService : IDisposable
             // Restore active tab
             if (!string.IsNullOrEmpty(session.ActiveFile))
             {
-                var active = OpenDocuments.FirstOrDefault(d => d.FilePath == session.ActiveFile);
-                if (active is not null)
+                bool activated;
+                lock (_docsLock)
                 {
-                    SetActive(active);
-                    StateChanged?.Invoke();
+                    var active = OpenDocuments.FirstOrDefault(d => d.FilePath == session.ActiveFile);
+                    activated = active is not null;
+                    if (active is not null)
+                        SetActive(active);
                 }
+                if (activated)
+                    StateChanged?.Invoke();
             }
         }
         catch
@@ -129,57 +145,66 @@ public partial class TabService : IDisposable
         string unifiedText)
     {
         var title = $"{left.FileName} ↔ {right.FileName}";
-        var existing = OpenDocuments.FirstOrDefault(d =>
-            d.IsDiff && d.DiffLeftPath == left.FilePath && d.DiffRightPath == right.FilePath);
-        if (existing is not null)
+        lock (_docsLock)
         {
-            SetActive(existing);
-            StateChanged?.Invoke();
-            return;
+            var existing = OpenDocuments.FirstOrDefault(d =>
+                d.IsDiff && d.DiffLeftPath == left.FilePath && d.DiffRightPath == right.FilePath);
+            if (existing is not null)
+            {
+                SetActive(existing);
+                StateChanged?.Invoke();
+                return;
+            }
+
+            var doc = new MarkdownDocument
+            {
+                FilePath = title,
+                Content = unifiedText,
+                IsDiff = true,
+                DiffLeftLabel = left.FileName,
+                DiffRightLabel = right.FileName,
+                DiffLeftPath = left.FilePath,
+                DiffRightPath = right.FilePath,
+                DiffUnifiedHtml = unifiedHtml,
+                DiffSideBySideHtml = sideBySideHtml,
+                DiffRenderedUnifiedHtml = renderedUnifiedHtml,
+                DiffRenderedSideBySideHtml = renderedSideBySideHtml,
+                IsLoading = false
+            };
+
+            OpenDocuments.Add(doc);
+            SetActive(doc);
         }
-
-        var doc = new MarkdownDocument
-        {
-            FilePath = title,
-            Content = unifiedText,
-            IsDiff = true,
-            DiffLeftLabel = left.FileName,
-            DiffRightLabel = right.FileName,
-            DiffLeftPath = left.FilePath,
-            DiffRightPath = right.FilePath,
-            DiffUnifiedHtml = unifiedHtml,
-            DiffSideBySideHtml = sideBySideHtml,
-            DiffRenderedUnifiedHtml = renderedUnifiedHtml,
-            DiffRenderedSideBySideHtml = renderedSideBySideHtml,
-            IsLoading = false
-        };
-
-        OpenDocuments.Add(doc);
-        SetActive(doc);
         StateChanged?.Invoke();
     }
 
     public void SetActiveDocument(MarkdownDocument doc)
     {
-        SetActive(doc);
+        lock (_docsLock)
+        {
+            SetActive(doc);
+        }
         StateChanged?.Invoke();
         _ = SaveSessionAsync();
     }
 
     public void CloseDocument(MarkdownDocument doc)
     {
-        var index = OpenDocuments.IndexOf(doc);
-        OpenDocuments.Remove(doc);
+        lock (_docsLock)
+        {
+            var index = OpenDocuments.IndexOf(doc);
+            OpenDocuments.Remove(doc);
+
+            if (ActiveDocument == doc)
+            {
+                SetActive(OpenDocuments.Count > 0
+                    ? OpenDocuments[Math.Min(index, OpenDocuments.Count - 1)]
+                    : null);
+            }
+        }
 
         if (!doc.IsDiff)
             UnwatchFile(doc.FilePath);
-
-        if (ActiveDocument == doc)
-        {
-            SetActive(OpenDocuments.Count > 0
-                ? OpenDocuments[Math.Min(index, OpenDocuments.Count - 1)]
-                : null);
-        }
 
         StateChanged?.Invoke();
         _ = SaveSessionAsync();
@@ -193,7 +218,10 @@ public partial class TabService : IDisposable
     /// </summary>
     private void WatchFile(string filePath)
     {
-        if (_watchers.ContainsKey(filePath)) return;
+        lock (_watcherStateLock)
+        {
+            if (_watchers.ContainsKey(filePath)) return;
+        }
 
         var dir = Path.GetDirectoryName(filePath);
         var name = Path.GetFileName(filePath);
@@ -208,8 +236,17 @@ public partial class TabService : IDisposable
             watcher.Changed += (_, _) => ScheduleReload(filePath);
             watcher.Created += (_, _) => ScheduleReload(filePath);
             watcher.Renamed += (_, _) => ScheduleReload(filePath);
+
+            lock (_watcherStateLock)
+            {
+                if (_watchers.ContainsKey(filePath))
+                {
+                    watcher.Dispose();
+                    return;
+                }
+                _watchers[filePath] = watcher;
+            }
             watcher.EnableRaisingEvents = true;
-            _watchers[filePath] = watcher;
         }
         catch
         {
@@ -219,19 +256,25 @@ public partial class TabService : IDisposable
 
     private void UnwatchFile(string filePath)
     {
-        if (_watchers.Remove(filePath, out var watcher))
+        FileSystemWatcher? watcher;
+        CancellationTokenSource? cts;
+        lock (_watcherStateLock)
+        {
+            _watchers.Remove(filePath, out watcher);
+            _pendingReloads.Remove(filePath, out cts);
+            _reloadGenerations.Remove(filePath);
+        }
+
+        if (watcher is not null)
         {
             watcher.EnableRaisingEvents = false;
             watcher.Dispose();
         }
 
-        lock (_pendingReloads)
+        if (cts is not null)
         {
-            if (_pendingReloads.Remove(filePath, out var cts))
-            {
-                cts.Cancel();
-                cts.Dispose();
-            }
+            cts.Cancel();
+            cts.Dispose();
         }
     }
 
@@ -239,7 +282,8 @@ public partial class TabService : IDisposable
     private void ScheduleReload(string filePath)
     {
         CancellationTokenSource cts;
-        lock (_pendingReloads)
+        int generation;
+        lock (_watcherStateLock)
         {
             if (_pendingReloads.TryGetValue(filePath, out var existing))
             {
@@ -249,33 +293,49 @@ public partial class TabService : IDisposable
 
             cts = new CancellationTokenSource();
             _pendingReloads[filePath] = cts;
+
+            generation = _reloadGenerations.TryGetValue(filePath, out var g) ? g + 1 : 1;
+            _reloadGenerations[filePath] = generation;
         }
 
-        _ = DebouncedReloadAsync(filePath, cts.Token);
+        _ = DebouncedReloadAsync(filePath, cts, generation);
     }
 
-    private async Task DebouncedReloadAsync(string filePath, CancellationToken token)
+    private async Task DebouncedReloadAsync(string filePath, CancellationTokenSource cts, int generation)
     {
         try
         {
-            await Task.Delay(ReloadDebounce, token);
+            await Task.Delay(ReloadDebounce, cts.Token);
+            await ReloadDocumentFromDiskAsync(filePath, generation);
         }
-        catch (TaskCanceledException)
+        catch (OperationCanceledException)
         {
-            return;
+            // Superseded by a newer change event; nothing to do.
         }
-
-        lock (_pendingReloads)
+        catch (Exception ex)
         {
-            _pendingReloads.Remove(filePath);
+            System.Diagnostics.Debug.WriteLine($"Reload error for '{filePath}': {ex.Message}");
         }
-
-        await ReloadDocumentFromDiskAsync(filePath);
+        finally
+        {
+            lock (_watcherStateLock)
+            {
+                // Only remove/dispose if we're still the current pending entry — a newer
+                // ScheduleReload call may have already replaced (and will dispose) us.
+                if (_pendingReloads.TryGetValue(filePath, out var current) && current == cts)
+                    _pendingReloads.Remove(filePath);
+            }
+            cts.Dispose();
+        }
     }
 
-    private async Task ReloadDocumentFromDiskAsync(string filePath)
+    private async Task ReloadDocumentFromDiskAsync(string filePath, int generation)
     {
-        var doc = OpenDocuments.FirstOrDefault(d => !d.IsDiff && d.FilePath == filePath);
+        MarkdownDocument? doc;
+        lock (_docsLock)
+        {
+            doc = OpenDocuments.FirstOrDefault(d => !d.IsDiff && d.FilePath == filePath);
+        }
         if (doc is null) return;
 
         string content;
@@ -288,8 +348,6 @@ public partial class TabService : IDisposable
             return;
         }
 
-        if (content == doc.Content) return;
-
         var (html, headings) = await Task.Run(() =>
         {
             var rawHtml = Markdown.ToHtml(content, _pipeline);
@@ -299,10 +357,25 @@ public partial class TabService : IDisposable
             return (rawHtml, ExtractHeadings(rawHtml));
         });
 
-        doc.Content = content;
-        doc.HtmlContent = html;
-        doc.Headings = headings;
-        doc.ReloadVersion++;
+        lock (_watcherStateLock)
+        {
+            // A newer save superseded this one while we were reading/rendering — drop this
+            // stale result so an out-of-order completion can't overwrite fresher content.
+            if (_reloadGenerations.TryGetValue(filePath, out var latest) && latest != generation)
+                return;
+        }
+
+        lock (_docsLock)
+        {
+            // Re-check the doc is still open — it may have been closed while we were reloading.
+            if (!OpenDocuments.Contains(doc)) return;
+            if (content == doc.Content) return;
+
+            doc.Content = content;
+            doc.HtmlContent = html;
+            doc.Headings = headings;
+            doc.ReloadVersion++;
+        }
         StateChanged?.Invoke();
     }
 
@@ -329,21 +402,22 @@ public partial class TabService : IDisposable
 
     public void Dispose()
     {
-        foreach (var watcher in _watchers.Values)
+        lock (_watcherStateLock)
         {
-            watcher.EnableRaisingEvents = false;
-            watcher.Dispose();
-        }
-        _watchers.Clear();
+            foreach (var watcher in _watchers.Values)
+            {
+                watcher.EnableRaisingEvents = false;
+                watcher.Dispose();
+            }
+            _watchers.Clear();
 
-        lock (_pendingReloads)
-        {
             foreach (var cts in _pendingReloads.Values)
             {
                 cts.Cancel();
                 cts.Dispose();
             }
             _pendingReloads.Clear();
+            _reloadGenerations.Clear();
         }
     }
 
@@ -351,15 +425,20 @@ public partial class TabService : IDisposable
     {
         try
         {
-            var openRealFiles = OpenDocuments.Where(d => !d.IsDiff).Select(d => d.FilePath).ToList();
+            List<string> openRealFiles;
+            string? activeFile;
+            lock (_docsLock)
+            {
+                openRealFiles = OpenDocuments.Where(d => !d.IsDiff).Select(d => d.FilePath).ToList();
 
-            // Only trust the diff-tab fallback if that file is still actually open — it can go
-            // stale if the real document behind it was closed while a diff tab stayed active.
-            var activeFile = ActiveDocument is { IsDiff: false }
-                ? ActiveDocument.FilePath
-                : _lastActiveRealFile is not null && openRealFiles.Contains(_lastActiveRealFile)
-                    ? _lastActiveRealFile
-                    : null;
+                // Only trust the diff-tab fallback if that file is still actually open — it can go
+                // stale if the real document behind it was closed while a diff tab stayed active.
+                activeFile = ActiveDocument is { IsDiff: false }
+                    ? ActiveDocument.FilePath
+                    : _lastActiveRealFile is not null && openRealFiles.Contains(_lastActiveRealFile)
+                        ? _lastActiveRealFile
+                        : null;
+            }
 
             var session = new SessionState
             {
