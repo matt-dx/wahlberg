@@ -118,7 +118,7 @@ public partial class TabService : IDisposable
                 bool activated;
                 lock (_docsLock)
                 {
-                    var active = _openDocuments.FirstOrDefault(d => PathsEqual(d.FilePath, session.ActiveFile));
+                    var active = _openDocuments.FirstOrDefault(d => !d.IsDiff && PathsEqual(d.FilePath, session.ActiveFile));
                     activated = active is not null;
                     if (active is not null)
                         SetActive(active);
@@ -139,7 +139,7 @@ public partial class TabService : IDisposable
         MarkdownDocument? doc = null;
         lock (_docsLock)
         {
-            existing = _openDocuments.FirstOrDefault(d => PathsEqual(d.FilePath, filePath));
+            existing = _openDocuments.FirstOrDefault(d => !d.IsDiff && PathsEqual(d.FilePath, filePath));
             if (existing is not null)
             {
                 SetActive(existing);
