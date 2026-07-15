@@ -10,6 +10,9 @@ public class MarkdownDocument
     public List<HeadingInfo> Headings { get; set; } = [];
     public bool IsLoading { get; set; } = false;
 
+    /// <summary>Bumped whenever content is reloaded from disk, so the UI can detect an in-place refresh even though <see cref="Id"/> stays the same.</summary>
+    public int ReloadVersion { get; set; }
+
     public bool IsDiff { get; init; } = false;
     public string? DiffLeftLabel { get; init; }
     public string? DiffRightLabel { get; init; }

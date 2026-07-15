@@ -75,7 +75,7 @@
 
     protected override void OnInitialized()
     {
-        _otherOpenDocuments = TabService.OpenDocuments
+        _otherOpenDocuments = TabService.GetOpenDocumentsSnapshot()
             .Where(d => !d.IsDiff && d != TabService.ActiveDocument)
             .ToList();
     }
@@ -146,7 +146,8 @@
                 var path = _browsedPath!;
                 var content = await File.ReadAllTextAsync(path);
                 await TabService.AddDocumentAsync(path, content);
-                right = TabService.OpenDocuments.First(d => d.FilePath == path);
+                right = TabService.FindOpenDocument(path)
+                    ?? throw new InvalidOperationException($"'{Path.GetFileName(path)}' was closed before the comparison could complete.");
             }
 
             var leftDir = Path.GetDirectoryName(left.FilePath);

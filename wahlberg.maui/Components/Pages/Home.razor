@@ -6,11 +6,19 @@
 @inject IJSRuntime JS
 @implements IDisposable
 
+@{
+    // Snapshotted once per render — TabService is a singleton that can be shared across
+    // multiple --serve circuits, so re-reading TabService.ActiveDocument repeatedly through
+    // this render could observe it change mid-pass (e.g. another circuit closing the tab)
+    // and hit a null-deref even after an earlier null-check passed.
+    var activeDoc = TabService.ActiveDocument;
+}
+
 <div class="toolbar">
     <button class="toolbar-btn" @onclick="OpenFile" title="Open File">
         <i class="bi bi-folder2-open"></i> Open
     </button>
-    @if (TabService.ActiveDocument is { IsDiff: false })
+    @if (activeDoc is { IsDiff: false })
     {
         @if (!string.IsNullOrEmpty(EditorService.EditorPath))
         {
@@ -46,12 +54,13 @@
 }
 
 <div class="workspace @(TabService.Orientation == TabOrientation.Vertical ? "vertical" : "horizontal")">
-    @if (TabService.OpenDocuments.Count > 0)
+    @{ var openDocs = TabService.GetOpenDocumentsSnapshot(); }
+    @if (openDocs.Count > 0)
     {
         <div class="tab-strip">
-            @foreach (var doc in TabService.OpenDocuments)
+            @foreach (var doc in openDocs)
             {
-                <div class="tab @(doc == TabService.ActiveDocument ? "active" : "")"
+                <div class="tab @(doc == activeDoc ? "active" : "")"
                      @onclick="() => TabService.SetActiveDocument(doc)">
                     <span class="tab-title" title="@doc.FilePath">@doc.FileName</span>
                     <button class="tab-close" @onclick="() => CloseTab(doc)" @onclick:stopPropagation="true" title="Close"><i class="bi bi-x"></i></button>
@@ -60,9 +69,9 @@
         </div>
 
         <div class="content-area">
-            @if (TabService.ActiveDocument is not null)
+            @if (activeDoc is not null)
             {
-                @if (TabService.ActiveDocument.Headings.Count > 0)
+                @if (activeDoc.Headings.Count > 0)
                 {
                     @if (_tocVisible)
                     {
@@ -72,7 +81,7 @@
                                 <button class="toc-collapse-btn" @onclick="ToggleToc" title="Collapse"><i class="bi bi-chevron-left"></i></button>
                             </div>
                             <nav class="toc-nav">
-                                @foreach (var heading in TabService.ActiveDocument.Headings)
+                                @foreach (var heading in activeDoc.Headings)
                                 {
                                     <a class="toc-item toc-level-@heading.Level @(heading.Id == _activeHeadingId ? "active" : "")"
                                        href="javascript:void(0)"
@@ -92,65 +101,65 @@
                     }
                 }
 
-                @if (TabService.ActiveDocument.IsDiff)
+                @if (activeDoc.IsDiff)
                 {
                     <div class="document-content diff-content">
                         <div class="diff-toolbar">
-                            <span class="diff-title">@TabService.ActiveDocument.DiffLeftLabel ↔ @TabService.ActiveDocument.DiffRightLabel</span>
+                            <span class="diff-title">@activeDoc.DiffLeftLabel ↔ @activeDoc.DiffRightLabel</span>
                             <div class="diff-toolbar-actions">
-                                @if (TabService.ActiveDocument.DiffMode != DiffViewMode.Raw)
+                                @if (activeDoc.DiffMode != DiffViewMode.Raw)
                                 {
                                     <button class="btn-secondary" @onclick="ToggleDiffLayout"
-                                            title="@(TabService.ActiveDocument.DiffShowSideBySide ? "Unified" : "Side-by-side")"
-                                            aria-label="@(TabService.ActiveDocument.DiffShowSideBySide ? "Unified" : "Side-by-side")">
-                                        <i class="bi @(TabService.ActiveDocument.DiffShowSideBySide ? "bi-square" : "bi-layout-split")"></i>
+                                            title="@(activeDoc.DiffShowSideBySide ? "Unified" : "Side-by-side")"
+                                            aria-label="@(activeDoc.DiffShowSideBySide ? "Unified" : "Side-by-side")">
+                                        <i class="bi @(activeDoc.DiffShowSideBySide ? "bi-square" : "bi-layout-split")"></i>
                                     </button>
                                     <button class="btn-secondary" @onclick="ToggleDiffStyle"
-                                            title="@(DiffStyleLabel(TabService.ActiveDocument.DiffMode))"
-                                            aria-label="@(DiffStyleLabel(TabService.ActiveDocument.DiffMode))">
-                                        @((MarkupString)DiffStyleIcon(TabService.ActiveDocument.DiffMode))
+                                            title="@(DiffStyleLabel(activeDoc.DiffMode))"
+                                            aria-label="@(DiffStyleLabel(activeDoc.DiffMode))">
+                                        @((MarkupString)DiffStyleIcon(activeDoc.DiffMode))
                                     </button>
                                 }
                                 <button class="btn-secondary" @onclick="ToggleDiffRaw"
-                                        title="@(DiffRawLabel(TabService.ActiveDocument.DiffMode))"
-                                        aria-label="@(DiffRawLabel(TabService.ActiveDocument.DiffMode))">
-                                    @((MarkupString)DiffRawIcon(TabService.ActiveDocument.DiffMode))
+                                        title="@(DiffRawLabel(activeDoc.DiffMode))"
+                                        aria-label="@(DiffRawLabel(activeDoc.DiffMode))">
+                                    @((MarkupString)DiffRawIcon(activeDoc.DiffMode))
                                 </button>
                                 <button class="btn-primary" @onclick="SaveDiff" title="Save diff">
                                     <i class="bi bi-floppy"></i> Save Diff
                                 </button>
                             </div>
                         </div>
-                        @if (TabService.ActiveDocument.DiffMode == DiffViewMode.Raw)
+                        @if (activeDoc.DiffMode == DiffViewMode.Raw)
                         {
-                            <pre class="diff-plain-text">@TabService.ActiveDocument.Content</pre>
+                            <pre class="diff-plain-text">@activeDoc.Content</pre>
                         }
-                        else if (TabService.ActiveDocument.DiffMode == DiffViewMode.Rendered)
+                        else if (activeDoc.DiffMode == DiffViewMode.Rendered)
                         {
                             <div class="diff-view diff-rendered markdown-body">
-                                @((MarkupString)(TabService.ActiveDocument.DiffShowSideBySide ? TabService.ActiveDocument.DiffRenderedSideBySideHtml : TabService.ActiveDocument.DiffRenderedUnifiedHtml))
+                                @((MarkupString)(activeDoc.DiffShowSideBySide ? activeDoc.DiffRenderedSideBySideHtml : activeDoc.DiffRenderedUnifiedHtml))
                             </div>
                         }
                         else
                         {
                             <div class="diff-view">
-                                @((MarkupString)(TabService.ActiveDocument.DiffShowSideBySide ? TabService.ActiveDocument.DiffSideBySideHtml : TabService.ActiveDocument.DiffUnifiedHtml))
+                                @((MarkupString)(activeDoc.DiffShowSideBySide ? activeDoc.DiffSideBySideHtml : activeDoc.DiffUnifiedHtml))
                             </div>
                         }
                     </div>
                 }
-                else if (TabService.ActiveDocument.IsLoading)
+                else if (activeDoc.IsLoading)
                 {
                     <div class="loading-state">
                         <div class="loading-spinner"></div>
-                        <p class="loading-label">Loading @TabService.ActiveDocument.FileName…</p>
+                        <p class="loading-label">Loading @activeDoc.FileName…</p>
                     </div>
                 }
                 else
                 {
                     <div class="document-content">
                         <div class="markdown-body">
-                            @((MarkupString)TabService.ActiveDocument.HtmlContent)
+                            @((MarkupString)activeDoc.HtmlContent)
                         </div>
                     </div>
                 }
@@ -191,6 +200,7 @@
     private string _activeHeadingId = "";
     private DotNetObjectReference<Home>? _dotNetRef;
     private Guid? _lastProcessedDocId;
+    private int _lastProcessedReloadVersion = -1;
     private DiffViewMode? _lastProcessedDiffMode;
     private bool? _lastProcessedDiffLayout;
 
@@ -254,7 +264,13 @@
         var doc = TabService.ActiveDocument;
         if (doc is not null && !doc.IsLoading)
         {
-            var isNewDoc = doc.Id != _lastProcessedDocId;
+            // Snapshot these once — doc.ReloadVersion is mutated by TabService's background
+            // reload path, and an await below gives that plenty of time to land mid-method,
+            // which would otherwise desync the isNewDoc decision from what we record below.
+            var docId = doc.Id;
+            var reloadVersion = doc.ReloadVersion;
+
+            var isNewDoc = docId != _lastProcessedDocId || reloadVersion != _lastProcessedReloadVersion;
             var isRenderedDiff = doc.IsDiff && doc.DiffMode == DiffViewMode.Rendered;
             var renderedDiffChanged = isRenderedDiff &&
                 (_lastProcessedDiffMode != DiffViewMode.Rendered || _lastProcessedDiffLayout != doc.DiffShowSideBySide);
@@ -269,7 +285,8 @@
                 }
             }
 
-            _lastProcessedDocId = doc.Id;
+            _lastProcessedDocId = docId;
+            _lastProcessedReloadVersion = reloadVersion;
             _lastProcessedDiffMode = doc.IsDiff ? doc.DiffMode : null;
             _lastProcessedDiffLayout = doc.IsDiff ? doc.DiffShowSideBySide : null;
         }
@@ -399,6 +416,7 @@
     {
         TabService.CloseDocument(doc);
         _lastProcessedDocId = null;
+        _lastProcessedReloadVersion = -1;
     }
 
     private void EditCurrentFile()

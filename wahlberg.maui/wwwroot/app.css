@@ -849,12 +849,16 @@ body.drag-over::after {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    animation: slideIn 0.2s ease-out;
+    animation: fadeIn 0.2s ease-out;
 }
 
-@keyframes slideIn {
-    from { transform: translateX(100%); }
-    to { transform: translateX(0); }
+/* Fades in rather than translating from off-canvas: a transform-based slide leaves the panel's
+   whole bounding box (and its action buttons) outside the viewport for the animation's duration,
+   which is unreachable to coordinate-based interaction (and can get stuck there if the browser
+   freezes CSS animations, e.g. in a backgrounded/hidden tab). */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 .settings-header {
