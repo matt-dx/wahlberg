@@ -275,11 +275,9 @@ public partial class TabService : IDisposable
             watcher.Dispose();
         }
 
-        if (cts is not null)
-        {
-            cts.Cancel();
-            cts.Dispose();
-        }
+        // Cancel only — the owning DebouncedReloadAsync's finally block disposes its own CTS.
+        // Disposing it here too would race a concurrent Dispose() call on the same instance.
+        cts?.Cancel();
     }
 
     /// <summary>Debounces bursts of filesystem events (editors often fire several per save) before reloading.</summary>
@@ -289,11 +287,9 @@ public partial class TabService : IDisposable
         int generation;
         lock (_watcherStateLock)
         {
+            // Cancel only — see the comment in UnwatchFile about not disposing here.
             if (_pendingReloads.TryGetValue(filePath, out var existing))
-            {
                 existing.Cancel();
-                existing.Dispose();
-            }
 
             cts = new CancellationTokenSource();
             _pendingReloads[filePath] = cts;
@@ -417,11 +413,9 @@ public partial class TabService : IDisposable
             }
             _watchers.Clear();
 
+            // Cancel only — see the comment in UnwatchFile about not disposing here.
             foreach (var cts in _pendingReloads.Values)
-            {
                 cts.Cancel();
-                cts.Dispose();
-            }
             _pendingReloads.Clear();
             _reloadGenerations.Clear();
         }
