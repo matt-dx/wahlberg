@@ -18,6 +18,10 @@ public partial class TabService : IDisposable
     private readonly Dictionary<string, FileSystemWatcher> _watchers = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, CancellationTokenSource> _pendingReloads = new(StringComparer.OrdinalIgnoreCase);
 
+    // Guards OpenDocuments (list mutations + lookups) since FileSystemWatcher callbacks run on
+    // ThreadPool threads and can otherwise race with UI-driven Add/Close calls.
+    private readonly object _docsLock = new();
+
     public List<MarkdownDocument> OpenDocuments { get; } = [];
     public MarkdownDocument? ActiveDocument { get; private set; }
     public TabOrientation Orientation { get; set; } = TabOrientation.Horizontal;
@@ -73,25 +77,28 @@ public partial class TabService : IDisposable
 
     public async Task AddDocumentAsync(string filePath, string content, bool saveSession = true)
     {
-        var existing = OpenDocuments.FirstOrDefault(d => d.FilePath == filePath);
-        if (existing is not null)
+        MarkdownDocument doc;
+        lock (_docsLock)
         {
-            SetActive(existing);
-            StateChanged?.Invoke();
-            return;
+            var existing = OpenDocuments.FirstOrDefault(d => d.FilePath == filePath);
+            if (existing is not null)
+            {
+                SetActive(existing);
+                StateChanged?.Invoke();
+                return;
+            }
+
+            doc = new MarkdownDocument
+            {
+                FilePath = filePath,
+                Content = content,
+                IsLoading = true
+            };
+
+            OpenDocuments.Add(doc);
+            SetActive(doc);
         }
-
-        var doc = new MarkdownDocument
-        {
-            FilePath = filePath,
-            Content = content,
-            IsLoading = true
-        };
-
-        OpenDocuments.Add(doc);
-        SetActive(doc);
         StateChanged?.Invoke();
-        WatchFile(filePath);
 
         var (html, headings) = await Task.Run(() =>
         {
@@ -106,6 +113,10 @@ public partial class TabService : IDisposable
         doc.Headings = headings;
         doc.IsLoading = false;
         StateChanged?.Invoke();
+
+        // Only start watching once the initial load has landed — otherwise a change event
+        // firing mid-load could reload stale content that the load above then overwrites.
+        WatchFile(filePath);
 
         if (saveSession)
             _ = SaveSessionAsync();
