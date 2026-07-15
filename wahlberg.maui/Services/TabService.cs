@@ -436,7 +436,13 @@ public partial class TabService : IDisposable
         {
             content = await ReadWithRetryAsync(filePath);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (IOException)
+        {
+            // Best-effort — e.g. a transient permissions hiccup. The next file-change
+            // event will trigger another attempt.
+            return;
+        }
+        catch (UnauthorizedAccessException)
         {
             // Best-effort — e.g. a transient permissions hiccup. The next file-change
             // event will trigger another attempt.
