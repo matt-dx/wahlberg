@@ -41,59 +41,29 @@ jobs:
         uses: microsoft/microsoft-store-apppublisher@v1.2
 
       - name: Configure MSStore CLI credentials
+        env:
+          MSSTORE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          MSSTORE_SELLER_ID: ${{ secrets.PARTNER_CENTER_SELLER_ID }}
+          MSSTORE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          MSSTORE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
         run: |
-          $maxAttempts = 10
-          $delaySeconds = 15
-          for ($i = 1; $i -le $maxAttempts; $i++) {
-            msstore reconfigure --tenantId ${{ secrets.AZURE_TENANT_ID }} --sellerId ${{ secrets.PARTNER_CENTER_SELLER_ID }} --clientId ${{ secrets.AZURE_CLIENT_ID }} --clientSecret ${{ secrets.AZURE_CLIENT_SECRET }}
-            if ($LASTEXITCODE -eq 0) { break }
-            Write-Warning "Attempt $i/$maxAttempts failed (exit $LASTEXITCODE). Retrying in $delaySeconds s..."
-            if ($i -lt $maxAttempts) { Start-Sleep -Seconds $delaySeconds }
-          }
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "msstore reconfigure failed after $maxAttempts attempts."
-            exit 1
+          . ./.github/scripts/MsstoreHelpers.ps1
+          Invoke-WithRetry -Description "msstore reconfigure" -Action {
+            msstore reconfigure --tenantId "$env:MSSTORE_TENANT_ID" --sellerId "$env:MSSTORE_SELLER_ID" --clientId "$env:MSSTORE_CLIENT_ID" --clientSecret "$env:MSSTORE_CLIENT_SECRET"
           }
 
       - name: List Store apps (debug)
         run: |
-          $maxAttempts = 10
-          $delaySeconds = 15
-          for ($i = 1; $i -le $maxAttempts; $i++) {
-            msstore apps list
-            if ($LASTEXITCODE -eq 0) { break }
-            Write-Warning "Attempt $i/$maxAttempts failed (exit $LASTEXITCODE). Retrying in $delaySeconds s..."
-            if ($i -lt $maxAttempts) { Start-Sleep -Seconds $delaySeconds }
-          }
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "msstore apps list failed after $maxAttempts attempts."
-            exit 1
-          }
+          . ./.github/scripts/MsstoreHelpers.ps1
+          Invoke-WithRetry -Description "msstore apps list" -Action { msstore apps list }
 
       - name: Check for pending submission
         run: |
-          $maxAttempts = 10
-          $delaySeconds = 15
-          $output = $null
-          for ($i = 1; $i -le $maxAttempts; $i++) {
-            $output = msstore submission status 9PN7LZ0ZNX9X 2>&1 | Out-String
-            if ($LASTEXITCODE -eq 0) { break }
-            Write-Warning "Attempt $i/$maxAttempts failed (exit $LASTEXITCODE). Retrying in $delaySeconds s..."
-            if ($i -lt $maxAttempts) { Start-Sleep -Seconds $delaySeconds }
-          }
-          Write-Output $output
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "msstore submission status failed after $maxAttempts attempts."
+          . ./.github/scripts/MsstoreHelpers.ps1
+          $status = Get-MsstoreSubmissionStatus -AppId "9PN7LZ0ZNX9X"
+          if ($status -and $script:BlockingSubmissionStatuses -contains $status) {
+            Write-Error "A submission is already in progress (status: $status). Wait for it to complete or cancel it in Partner Center before pushing again."
             exit 1
-          }
-          $clean = $output -replace '\x1b\[[\d;]*[mGKHF]', ''
-          if ($clean -match 'Submission Status\s*=\s*(\S+)') {
-            $status = $Matches[1].Trim()
-            $blocking = @('PendingCommit','CommitStarted','PendingPublication','Publishing','PreProcessing','Certification','Release')
-            if ($blocking -contains $status) {
-              Write-Error "A submission is already in progress (status: $status). Wait for it to complete or cancel it in Partner Center before pushing again."
-              exit 1
-            }
           }
 
       - name: Install MAUI workload
@@ -118,15 +88,35 @@ jobs:
 
       - name: Submit to Microsoft Store
         run: |
+          . ./.github/scripts/MsstoreHelpers.ps1
+          $appId = "9PN7LZ0ZNX9X"
           $maxAttempts = 10
           $delaySeconds = 15
+          # Tracked explicitly rather than trusting $LASTEXITCODE after the loop — the
+          # status-check call below runs its own commands and overwrites $LASTEXITCODE.
+          $succeeded = $false
           for ($i = 1; $i -le $maxAttempts; $i++) {
-            msstore publish wahlberg.maui --appId 9PN7LZ0ZNX9X
-            if ($LASTEXITCODE -eq 0) { break }
-            Write-Warning "Attempt $i/$maxAttempts failed (exit $LASTEXITCODE). Retrying in $delaySeconds s..."
-            if ($i -lt $maxAttempts) { Start-Sleep -Seconds $delaySeconds }
+            msstore publish wahlberg.maui --appId $appId
+            if ($LASTEXITCODE -eq 0) { $succeeded = $true; break }
+
+            Write-Warning "Attempt $i/$maxAttempts of 'msstore publish' failed (exit $LASTEXITCODE)."
+
+            # A "failed" attempt can still have been accepted server-side (e.g. a transient
+            # network error after the request went through) — check status before retrying
+            # so we don't create a duplicate submission.
+            $status = Get-MsstoreSubmissionStatus -AppId $appId
+            if ($status -and $script:BlockingSubmissionStatuses -contains $status) {
+              Write-Host "A submission was created by the previous attempt (status: $status) despite the reported failure — not retrying, to avoid a duplicate."
+              $succeeded = $true
+              break
+            }
+
+            if ($i -lt $maxAttempts) {
+              Write-Warning "No in-progress submission detected; retrying in $delaySeconds s..."
+              Start-Sleep -Seconds $delaySeconds
+            }
           }
-          if ($LASTEXITCODE -ne 0) {
+          if (-not $succeeded) {
             Write-Error "msstore publish failed after $maxAttempts attempts."
             exit 1
           }
