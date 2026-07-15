@@ -133,9 +133,22 @@ public partial class TabService : IDisposable
             return (rawHtml, ExtractHeadings(rawHtml));
         });
 
-        newDoc.HtmlContent = html;
-        newDoc.Headings = headings;
-        newDoc.IsLoading = false;
+        bool stillOpen;
+        lock (_docsLock)
+        {
+            stillOpen = OpenDocuments.Contains(newDoc);
+            if (stillOpen)
+            {
+                newDoc.HtmlContent = html;
+                newDoc.Headings = headings;
+                newDoc.IsLoading = false;
+            }
+        }
+
+        // The tab was closed while the render was in flight — don't touch the (no longer
+        // open) document or start watching a file nothing references anymore.
+        if (!stillOpen) return;
+
         StateChanged?.Invoke();
 
         // Only start watching once the initial load has landed — otherwise a change event
