@@ -93,28 +93,32 @@ public partial class TabService : IDisposable
 
     public async Task AddDocumentAsync(string filePath, string content, bool saveSession = true)
     {
-        MarkdownDocument doc;
+        MarkdownDocument? existing;
+        MarkdownDocument? doc = null;
         lock (_docsLock)
         {
-            var existing = OpenDocuments.FirstOrDefault(d => d.FilePath == filePath);
+            existing = OpenDocuments.FirstOrDefault(d => d.FilePath == filePath);
             if (existing is not null)
             {
                 SetActive(existing);
-                StateChanged?.Invoke();
-                return;
             }
-
-            doc = new MarkdownDocument
+            else
             {
-                FilePath = filePath,
-                Content = content,
-                IsLoading = true
-            };
+                doc = new MarkdownDocument
+                {
+                    FilePath = filePath,
+                    Content = content,
+                    IsLoading = true
+                };
 
-            OpenDocuments.Add(doc);
-            SetActive(doc);
+                OpenDocuments.Add(doc);
+                SetActive(doc);
+            }
         }
         StateChanged?.Invoke();
+
+        if (existing is not null) return;
+        var newDoc = doc!;
 
         var (html, headings) = await Task.Run(() =>
         {
@@ -125,9 +129,9 @@ public partial class TabService : IDisposable
             return (rawHtml, ExtractHeadings(rawHtml));
         });
 
-        doc.HtmlContent = html;
-        doc.Headings = headings;
-        doc.IsLoading = false;
+        newDoc.HtmlContent = html;
+        newDoc.Headings = headings;
+        newDoc.IsLoading = false;
         StateChanged?.Invoke();
 
         // Only start watching once the initial load has landed — otherwise a change event
@@ -152,28 +156,28 @@ public partial class TabService : IDisposable
             if (existing is not null)
             {
                 SetActive(existing);
-                StateChanged?.Invoke();
-                return;
             }
-
-            var doc = new MarkdownDocument
+            else
             {
-                FilePath = title,
-                Content = unifiedText,
-                IsDiff = true,
-                DiffLeftLabel = left.FileName,
-                DiffRightLabel = right.FileName,
-                DiffLeftPath = left.FilePath,
-                DiffRightPath = right.FilePath,
-                DiffUnifiedHtml = unifiedHtml,
-                DiffSideBySideHtml = sideBySideHtml,
-                DiffRenderedUnifiedHtml = renderedUnifiedHtml,
-                DiffRenderedSideBySideHtml = renderedSideBySideHtml,
-                IsLoading = false
-            };
+                var doc = new MarkdownDocument
+                {
+                    FilePath = title,
+                    Content = unifiedText,
+                    IsDiff = true,
+                    DiffLeftLabel = left.FileName,
+                    DiffRightLabel = right.FileName,
+                    DiffLeftPath = left.FilePath,
+                    DiffRightPath = right.FilePath,
+                    DiffUnifiedHtml = unifiedHtml,
+                    DiffSideBySideHtml = sideBySideHtml,
+                    DiffRenderedUnifiedHtml = renderedUnifiedHtml,
+                    DiffRenderedSideBySideHtml = renderedSideBySideHtml,
+                    IsLoading = false
+                };
 
-            OpenDocuments.Add(doc);
-            SetActive(doc);
+                OpenDocuments.Add(doc);
+                SetActive(doc);
+            }
         }
         StateChanged?.Invoke();
     }
@@ -343,8 +347,10 @@ public partial class TabService : IDisposable
         {
             content = await ReadWithRetryAsync(filePath);
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            // Best-effort — e.g. a transient permissions hiccup. The next file-change
+            // event will trigger another attempt.
             return;
         }
 
