@@ -90,6 +90,16 @@ jobs:
         run: |
           . ./.github/scripts/MsstoreHelpers.ps1
           $appId = "9PN7LZ0ZNX9X"
+
+          # Re-check right before publishing — the build/packaging steps between the earlier
+          # "Check for pending submission" step and here can take several minutes, long enough
+          # for another run (or a manual Partner Center action) to have started a submission.
+          $preflightStatus = Get-MsstoreSubmissionStatus -AppId $appId
+          if ($preflightStatus -and $script:BlockingSubmissionStatuses -contains $preflightStatus) {
+            Write-Error "A submission is already in progress (status: $preflightStatus). Wait for it to complete or cancel it in Partner Center before pushing again."
+            exit 1
+          }
+
           $maxAttempts = 10
           $delaySeconds = 15
           # Tracked explicitly rather than trusting $LASTEXITCODE after the loop — the

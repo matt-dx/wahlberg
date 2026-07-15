@@ -14,15 +14,23 @@ public partial class TabService : IDisposable
 
     private readonly string _sessionPath = Path.Combine(FileSystem.AppDataDirectory, "session.json");
 
+    // Windows/macOS file systems are case-insensitive; Android's typically isn't. This app
+    // targets both, so every path-keyed dictionary and comparison below uses this comparer
+    // rather than hard-coding one or the other.
+    private static readonly StringComparer PathComparer =
+        OperatingSystem.IsWindows() || OperatingSystem.IsMacCatalyst() || OperatingSystem.IsIOS()
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal;
+
     private static readonly TimeSpan ReloadDebounce = TimeSpan.FromMilliseconds(400);
-    private readonly Dictionary<string, FileSystemWatcher> _watchers = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, CancellationTokenSource> _pendingReloads = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, FileSystemWatcher> _watchers = new(PathComparer);
+    private readonly Dictionary<string, CancellationTokenSource> _pendingReloads = new(PathComparer);
 
     // Bumped per file on every ScheduleReload call. ReloadDocumentFromDiskAsync stamps the
     // generation it was scheduled with and, once its (possibly slow) read+render finishes,
     // discards the result if a newer reload has since been scheduled for the same path — this
     // stops two overlapping reloads (from two quick saves) from applying out of order.
-    private readonly Dictionary<string, int> _reloadGenerations = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, int> _reloadGenerations = new(PathComparer);
 
     // Guards _watchers/_pendingReloads/_reloadGenerations, which FileSystemWatcher callbacks
     // (ThreadPool threads) touch alongside WatchFile/UnwatchFile (UI-driven).
@@ -42,9 +50,9 @@ public partial class TabService : IDisposable
     // clobber the ActiveFile session restores to on next launch.
     private string? _lastActiveRealFile;
 
-    // Windows paths are case-insensitive; used everywhere a FilePath is compared so
-    // OpenDocuments dedup logic matches the case-insensitive _watchers/_pendingReloads keys.
-    private static bool PathsEqual(string? a, string? b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+    // Used everywhere a FilePath is compared so OpenDocuments dedup logic matches
+    // the same platform-appropriate comparer as the _watchers/_pendingReloads keys.
+    private static bool PathsEqual(string? a, string? b) => PathComparer.Equals(a, b);
 
     private void SetActive(MarkdownDocument? doc)
     {
