@@ -1,7 +1,10 @@
 # Shared retry/status helpers for the msstore CLI steps in Publish-msix.yml.
 # Dot-source this file at the top of a step's run: block: . ./.github/scripts/MsstoreHelpers.ps1
 
-$script:BlockingSubmissionStatuses = @(
+# Global (not script) scope so this stays visible to callers regardless of whether this file
+# is dot-sourced from a top-level step script or a nested one — dot-sourcing itself doesn't
+# introduce a new scope, but $global: is robust even if that ever changes.
+$global:BlockingSubmissionStatuses = @(
     'PendingCommit', 'CommitStarted', 'PendingPublication',
     'Publishing', 'PreProcessing', 'Certification', 'Release'
 )

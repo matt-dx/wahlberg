@@ -61,7 +61,7 @@ jobs:
         run: |
           . ./.github/scripts/MsstoreHelpers.ps1
           $status = Get-MsstoreSubmissionStatus -AppId "9PN7LZ0ZNX9X"
-          if ($status -and $script:BlockingSubmissionStatuses -contains $status) {
+          if ($status -and $global:BlockingSubmissionStatuses -contains $status) {
             Write-Error "A submission is already in progress (status: $status). Wait for it to complete or cancel it in Partner Center before pushing again."
             exit 1
           }
@@ -95,7 +95,7 @@ jobs:
           # "Check for pending submission" step and here can take several minutes, long enough
           # for another run (or a manual Partner Center action) to have started a submission.
           $preflightStatus = Get-MsstoreSubmissionStatus -AppId $appId
-          if ($preflightStatus -and $script:BlockingSubmissionStatuses -contains $preflightStatus) {
+          if ($preflightStatus -and $global:BlockingSubmissionStatuses -contains $preflightStatus) {
             Write-Error "A submission is already in progress (status: $preflightStatus). Wait for it to complete or cancel it in Partner Center before pushing again."
             exit 1
           }
@@ -115,7 +115,7 @@ jobs:
             # network error after the request went through) — check status before retrying
             # so we don't create a duplicate submission.
             $status = Get-MsstoreSubmissionStatus -AppId $appId
-            if ($status -and $script:BlockingSubmissionStatuses -contains $status) {
+            if ($status -and $global:BlockingSubmissionStatuses -contains $status) {
               Write-Host "A submission was created by the previous attempt (status: $status) despite the reported failure — not retrying, to avoid a duplicate."
               $succeeded = $true
               break
