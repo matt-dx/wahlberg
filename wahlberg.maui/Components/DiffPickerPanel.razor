@@ -75,7 +75,7 @@
 
     protected override void OnInitialized()
     {
-        _otherOpenDocuments = TabService.OpenDocuments
+        _otherOpenDocuments = TabService.GetOpenDocumentsSnapshot()
             .Where(d => !d.IsDiff && d != TabService.ActiveDocument)
             .ToList();
     }

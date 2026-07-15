@@ -37,13 +37,13 @@ public partial class TabService : IDisposable
     // (ThreadPool threads) touch alongside WatchFile/UnwatchFile (UI-driven).
     private readonly object _watcherStateLock = new();
 
-    // Guards OpenDocuments/ActiveDocument since FileSystemWatcher-driven reloads can otherwise
+    // Guards _openDocuments/ActiveDocument since FileSystemWatcher-driven reloads can otherwise
     // race with UI-driven Add/Close/SetActive calls. Never held at the same time as
     // _watcherStateLock — the two are always acquired one at a time, so lock ordering can't
     // deadlock.
     private readonly object _docsLock = new();
 
-    public List<MarkdownDocument> OpenDocuments { get; } = [];
+    private readonly List<MarkdownDocument> _openDocuments = [];
     public MarkdownDocument? ActiveDocument { get; private set; }
     public TabOrientation Orientation { get; set; } = TabOrientation.Horizontal;
 
@@ -51,7 +51,7 @@ public partial class TabService : IDisposable
     // clobber the ActiveFile session restores to on next launch.
     private string? _lastActiveRealFile;
 
-    // Used everywhere a FilePath is compared so OpenDocuments dedup logic matches
+    // Used everywhere a FilePath is compared so _openDocuments dedup logic matches
     // the same platform-appropriate comparer as the _watchers/_pendingReloads keys.
     private static bool PathsEqual(string? a, string? b) => PathComparer.Equals(a, b);
 
@@ -65,7 +65,22 @@ public partial class TabService : IDisposable
     {
         lock (_docsLock)
         {
-            return OpenDocuments.FirstOrDefault(d => !d.IsDiff && PathsEqual(d.FilePath, filePath));
+            return _openDocuments.FirstOrDefault(d => !d.IsDiff && PathsEqual(d.FilePath, filePath));
+        }
+    }
+
+    /// <summary>
+    /// A point-in-time copy of the open document list. UI code should enumerate this instead
+    /// of a live reference — TabService can be a singleton shared across multiple Blazor
+    /// Server circuits (--serve mode), and a FileSystemWatcher-driven reload runs on a
+    /// ThreadPool thread, so an unsynchronized enumeration of the live list could observe it
+    /// mid-mutation and throw.
+    /// </summary>
+    public IReadOnlyList<MarkdownDocument> GetOpenDocumentsSnapshot()
+    {
+        lock (_docsLock)
+        {
+            return _openDocuments.ToList();
         }
     }
 
@@ -103,7 +118,7 @@ public partial class TabService : IDisposable
                 bool activated;
                 lock (_docsLock)
                 {
-                    var active = OpenDocuments.FirstOrDefault(d => PathsEqual(d.FilePath, session.ActiveFile));
+                    var active = _openDocuments.FirstOrDefault(d => PathsEqual(d.FilePath, session.ActiveFile));
                     activated = active is not null;
                     if (active is not null)
                         SetActive(active);
@@ -124,7 +139,7 @@ public partial class TabService : IDisposable
         MarkdownDocument? doc = null;
         lock (_docsLock)
         {
-            existing = OpenDocuments.FirstOrDefault(d => PathsEqual(d.FilePath, filePath));
+            existing = _openDocuments.FirstOrDefault(d => PathsEqual(d.FilePath, filePath));
             if (existing is not null)
             {
                 SetActive(existing);
@@ -138,7 +153,7 @@ public partial class TabService : IDisposable
                     IsLoading = true
                 };
 
-                OpenDocuments.Add(doc);
+                _openDocuments.Add(doc);
                 SetActive(doc);
             }
         }
@@ -166,7 +181,7 @@ public partial class TabService : IDisposable
         bool stillOpen;
         lock (_docsLock)
         {
-            stillOpen = OpenDocuments.Contains(newDoc);
+            stillOpen = _openDocuments.Contains(newDoc);
             if (stillOpen)
             {
                 newDoc.HtmlContent = html;
@@ -198,7 +213,7 @@ public partial class TabService : IDisposable
         var title = $"{left.FileName} ↔ {right.FileName}";
         lock (_docsLock)
         {
-            var existing = OpenDocuments.FirstOrDefault(d =>
+            var existing = _openDocuments.FirstOrDefault(d =>
                 d.IsDiff && PathsEqual(d.DiffLeftPath, left.FilePath) && PathsEqual(d.DiffRightPath, right.FilePath));
             if (existing is not null)
             {
@@ -222,7 +237,7 @@ public partial class TabService : IDisposable
                     IsLoading = false
                 };
 
-                OpenDocuments.Add(doc);
+                _openDocuments.Add(doc);
                 SetActive(doc);
             }
         }
@@ -243,13 +258,13 @@ public partial class TabService : IDisposable
     {
         lock (_docsLock)
         {
-            var index = OpenDocuments.IndexOf(doc);
-            OpenDocuments.Remove(doc);
+            var index = _openDocuments.IndexOf(doc);
+            _openDocuments.Remove(doc);
 
             if (ActiveDocument == doc)
             {
-                SetActive(OpenDocuments.Count > 0
-                    ? OpenDocuments[Math.Min(index, OpenDocuments.Count - 1)]
+                SetActive(_openDocuments.Count > 0
+                    ? _openDocuments[Math.Min(index, _openDocuments.Count - 1)]
                     : null);
             }
         }
@@ -397,7 +412,7 @@ public partial class TabService : IDisposable
         MarkdownDocument? doc;
         lock (_docsLock)
         {
-            doc = OpenDocuments.FirstOrDefault(d => !d.IsDiff && PathsEqual(d.FilePath, filePath));
+            doc = _openDocuments.FirstOrDefault(d => !d.IsDiff && PathsEqual(d.FilePath, filePath));
         }
         if (doc is null) return;
 
@@ -418,7 +433,7 @@ public partial class TabService : IDisposable
             // FileSystemWatcher often fires more than once per save (and can fire even when
             // content didn't change) — skip the expensive Markdig render entirely if nothing
             // actually changed on disk.
-            if (!OpenDocuments.Contains(doc)) return;
+            if (!_openDocuments.Contains(doc)) return;
             if (content == doc.Content) return;
         }
 
@@ -443,7 +458,7 @@ public partial class TabService : IDisposable
         {
             // Re-check the doc is still open and content still differs — both may have
             // changed while we were reloading.
-            if (!OpenDocuments.Contains(doc)) return;
+            if (!_openDocuments.Contains(doc)) return;
             if (content == doc.Content) return;
 
             doc.Content = content;
@@ -500,7 +515,7 @@ public partial class TabService : IDisposable
             string? activeFile;
             lock (_docsLock)
             {
-                openRealFiles = OpenDocuments.Where(d => !d.IsDiff).Select(d => d.FilePath).ToList();
+                openRealFiles = _openDocuments.Where(d => !d.IsDiff).Select(d => d.FilePath).ToList();
 
                 // Only trust the diff-tab fallback if that file is still actually open — it can go
                 // stale if the real document behind it was closed while a diff tab stayed active.

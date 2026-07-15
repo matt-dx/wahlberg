@@ -46,10 +46,11 @@
 }
 
 <div class="workspace @(TabService.Orientation == TabOrientation.Vertical ? "vertical" : "horizontal")">
-    @if (TabService.OpenDocuments.Count > 0)
+    @{ var openDocs = TabService.GetOpenDocumentsSnapshot(); }
+    @if (openDocs.Count > 0)
     {
         <div class="tab-strip">
-            @foreach (var doc in TabService.OpenDocuments)
+            @foreach (var doc in openDocs)
             {
                 <div class="tab @(doc == TabService.ActiveDocument ? "active" : "")"
                      @onclick="() => TabService.SetActiveDocument(doc)">
