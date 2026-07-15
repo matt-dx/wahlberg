@@ -144,7 +144,14 @@ public partial class TabService : IDisposable
         }
         StateChanged?.Invoke();
 
-        if (existing is not null) return;
+        if (existing is not null)
+        {
+            // Reactivating an already-open tab still changes ActiveFile — persist it,
+            // matching SetActiveDocument's behavior, so it survives a restart.
+            if (saveSession)
+                _ = SaveSessionAsync();
+            return;
+        }
         var newDoc = doc!;
 
         var (html, headings) = await Task.Run(() =>
