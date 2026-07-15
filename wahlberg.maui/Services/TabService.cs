@@ -14,9 +14,10 @@ public partial class TabService : IDisposable
 
     private readonly string _sessionPath = Path.Combine(FileSystem.AppDataDirectory, "session.json");
 
-    // Windows/macOS file systems are case-insensitive; Android's typically isn't. This app
-    // targets both, so every path-keyed dictionary and comparison below uses this comparer
-    // rather than hard-coding one or the other.
+    // A platform heuristic, not true filesystem detection: Windows/iOS/macCatalyst are
+    // case-insensitive by default (though a non-default case-sensitive APFS volume is
+    // possible on Apple platforms), Android's typically isn't. Every path-keyed dictionary
+    // and comparison below uses this rather than hard-coding one or the other.
     private static readonly StringComparer PathComparer =
         OperatingSystem.IsWindows() || OperatingSystem.IsMacCatalyst() || OperatingSystem.IsIOS()
             ? StringComparer.OrdinalIgnoreCase
