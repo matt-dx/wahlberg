@@ -312,8 +312,11 @@ public partial class TabService : IDisposable
                     return;
                 }
                 _watchers[filePath] = watcher;
+                // Enabled while still holding the lock — UnwatchFile also takes this lock,
+                // so it can't dispose this instance between registration and enabling
+                // (which would otherwise throw ObjectDisposedException here).
+                watcher.EnableRaisingEvents = true;
             }
-            watcher.EnableRaisingEvents = true;
         }
         catch
         {
@@ -328,7 +331,19 @@ public partial class TabService : IDisposable
                 }
                 watcher.Dispose();
             }
+            return;
         }
+
+        // AddDocumentAsync releases _docsLock before calling WatchFile, so the tab could
+        // have been closed while this watcher was being set up — if so, tear down what was
+        // just registered rather than leaking a watcher nothing will ever unwatch again.
+        bool stillOpen;
+        lock (_docsLock)
+        {
+            stillOpen = _openDocuments.Any(d => !d.IsDiff && PathsEqual(d.FilePath, filePath));
+        }
+        if (!stillOpen)
+            UnwatchFile(filePath);
     }
 
     private void UnwatchFile(string filePath)
