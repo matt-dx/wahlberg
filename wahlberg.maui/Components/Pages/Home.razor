@@ -255,7 +255,13 @@
         var doc = TabService.ActiveDocument;
         if (doc is not null && !doc.IsLoading)
         {
-            var isNewDoc = doc.Id != _lastProcessedDocId || doc.ReloadVersion != _lastProcessedReloadVersion;
+            // Snapshot these once — doc.ReloadVersion is mutated by TabService's background
+            // reload path, and an await below gives that plenty of time to land mid-method,
+            // which would otherwise desync the isNewDoc decision from what we record below.
+            var docId = doc.Id;
+            var reloadVersion = doc.ReloadVersion;
+
+            var isNewDoc = docId != _lastProcessedDocId || reloadVersion != _lastProcessedReloadVersion;
             var isRenderedDiff = doc.IsDiff && doc.DiffMode == DiffViewMode.Rendered;
             var renderedDiffChanged = isRenderedDiff &&
                 (_lastProcessedDiffMode != DiffViewMode.Rendered || _lastProcessedDiffLayout != doc.DiffShowSideBySide);
@@ -270,8 +276,8 @@
                 }
             }
 
-            _lastProcessedDocId = doc.Id;
-            _lastProcessedReloadVersion = doc.ReloadVersion;
+            _lastProcessedDocId = docId;
+            _lastProcessedReloadVersion = reloadVersion;
             _lastProcessedDiffMode = doc.IsDiff ? doc.DiffMode : null;
             _lastProcessedDiffLayout = doc.IsDiff ? doc.DiffShowSideBySide : null;
         }
