@@ -10,6 +10,7 @@ A cross-platform Markdown viewer built with .NET MAUI and Blazor.
 - **Session restore** — reopens your previously open files on next launch
 - **Drag and drop** — drop a Markdown file onto the window to open it
 - **Local image support** — relative image paths in documents resolve to local files
+- **Export tables to CSV** — every rendered table gets an icon-only button to save its data as a `.csv` file
 - **Web service mode** (Windows) — run headless with `--serve [--port N]` to drive the app through a browser instead of the native window
 
 ## Supported Platforms

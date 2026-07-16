@@ -348,6 +348,33 @@
         _ = TabService.AddDocumentAsync(fileName, content);
     }
 
+    [JSInvokable]
+    public async Task ExportTableAsCsv(string csvContent, int tableIndex)
+    {
+        var doc = TabService.ActiveDocument;
+        var baseName = doc is not null ? Path.GetFileNameWithoutExtension(doc.FileName) : "table";
+        var fileName = $"{baseName}-table-{tableIndex + 1}.csv";
+
+        try
+        {
+            var bytes = System.Text.Encoding.UTF8.GetBytes(csvContent);
+
+            if (AppMode.IsServiceMode)
+            {
+                using var streamRef = new DotNetStreamReference(new MemoryStream(bytes));
+                await JS.InvokeVoidAsync("appInterop.downloadFileFromStream", fileName, streamRef);
+                return;
+            }
+
+            using var stream = new MemoryStream(bytes);
+            await FileSaver.Default.SaveAsync(fileName, stream, default);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Export table CSV error: {ex.Message}");
+        }
+    }
+
     private bool _showPathInput;
     private string _pathInputValue = "";
 

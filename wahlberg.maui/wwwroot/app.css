@@ -208,6 +208,31 @@ body.drag-over::after {
     background: color-mix(in srgb, var(--theme-accent) 12%, var(--theme-bg));
 }
 
+.table-export-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin: 1em 0 0;
+}
+.table-export-toolbar + table {
+    margin-top: 0.25em;
+}
+.table-export-btn {
+    background: none;
+    border: 1px solid var(--theme-border);
+    border-radius: 4px;
+    color: var(--theme-text);
+    cursor: pointer;
+    padding: 3px 6px;
+    font-size: 13px;
+    line-height: 1;
+    opacity: 0.7;
+    transition: opacity 0.15s, background 0.15s;
+}
+.table-export-btn:hover {
+    opacity: 1;
+    background: color-mix(in srgb, var(--theme-accent) 15%, transparent);
+}
+
 .markdown-body img {
     max-width: 100%;
     border-radius: 4px;
