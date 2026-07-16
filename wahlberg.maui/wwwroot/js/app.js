@@ -60,6 +60,7 @@ window.appInterop = {
         this._setupScrollTracking();
         this._setupLinkHandling();
         this._renderDiff();
+        this._injectTableExportButtons();
         await this._renderMermaid();
     },
 
@@ -193,6 +194,69 @@ window.appInterop = {
                 return '<span class="' + cls + '">' + line + '</span>';
             }).join('');
         });
+    },
+
+    // Scoped to the plain (non-diff) content container — diff-view tables are out of scope.
+    _injectTableExportButtons: function () {
+        const container = document.querySelector('.document-content:not(.diff-content)');
+        if (!container) return;
+
+        const self = this;
+        container.querySelectorAll('table:not([data-csv-export-processed])').forEach(function (table) {
+            table.setAttribute('data-csv-export-processed', 'true');
+
+            const toolbar = document.createElement('div');
+            toolbar.className = 'table-export-toolbar';
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'table-export-btn';
+            btn.title = 'Export as CSV';
+            btn.setAttribute('aria-label', 'Export as CSV');
+            btn.innerHTML = '<i class="bi bi-filetype-csv"></i>';
+            btn.addEventListener('click', async function () {
+                if (!self._dotNetRef) return;
+                try {
+                    const csv = self._tableToCsv(table);
+                    const tableIndex = Array.from(container.querySelectorAll('table')).indexOf(table);
+
+                    // Only a filename crosses the wire here — in service mode the CSV itself
+                    // never leaves the browser (avoids the large-SignalR-message risk SaveDiff
+                    // avoids in the opposite direction); the native path saves via .NET's
+                    // FileSaver instead.
+                    const info = await self._dotNetRef.invokeMethodAsync('GetTableCsvExportInfo', tableIndex);
+                    if (info.isServiceMode) {
+                        self._triggerDownload(info.fileName, new Blob([csv], { type: 'text/csv' }));
+                    } else {
+                        await self._dotNetRef.invokeMethodAsync('SaveTableCsv', csv, info.fileName);
+                    }
+                } catch (e) {
+                    console.error('CSV export error:', e);
+                }
+            });
+
+            toolbar.appendChild(btn);
+            table.parentNode.insertBefore(toolbar, table);
+        });
+    },
+
+    _tableToCsv: function (table) {
+        const lines = [];
+        table.querySelectorAll('tr').forEach(function (row) {
+            const fields = Array.from(row.querySelectorAll('th, td')).map(function (cell) {
+                // textContent alone drops <br> entirely (no "\n", no space) — replace it with
+                // a literal newline on a clone first so line breaks survive into the CSV field.
+                const clone = cell.cloneNode(true);
+                clone.querySelectorAll('br').forEach(function (br) { br.replaceWith('\n'); });
+
+                // Collapse runs of spaces/tabs, but keep the newlines from <br> above intact
+                // so the quoting below actually has a "\n" to quote.
+                const text = clone.textContent.replace(/[ \t]+/g, ' ').trim();
+                return /[",\r\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+            });
+            lines.push(fields.join(','));
+        });
+        return lines.join('\r\n');
     },
 
     _renderMermaid: async function () {

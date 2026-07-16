@@ -348,6 +348,47 @@
         _ = TabService.AddDocumentAsync(fileName, content);
     }
 
+    public sealed record TableCsvExportInfo(string FileName, bool IsServiceMode);
+
+    // Returns only the filename (plus the mode flag JS needs to decide how to save) — the CSV
+    // content itself never crosses this call, so a large table can't blow up a Blazor Server
+    // SignalR message the way a JS-to-.NET call carrying the full CSV string would.
+    [JSInvokable]
+    public TableCsvExportInfo GetTableCsvExportInfo(int tableIndex)
+    {
+        var doc = TabService.ActiveDocument;
+        var baseName = doc is not null ? Path.GetFileNameWithoutExtension(doc.FileName) : "table";
+        return new TableCsvExportInfo($"{baseName}-table-{tableIndex + 1}.csv", AppMode.IsServiceMode);
+    }
+
+    // Native-only save path (service mode downloads the CSV as a browser Blob entirely in JS
+    // instead — see appInterop's table-export click handler). Guarded here too: the JS side
+    // never calls this in service mode, but a client could still invoke it directly, which
+    // would both defeat the SignalR-size mitigation and hit a FileSaver call service mode
+    // doesn't support.
+    [JSInvokable]
+    public async Task SaveTableCsv(string csvContent, string fileName)
+    {
+        if (AppMode.IsServiceMode) return;
+
+        try
+        {
+            // fileName crosses the JS interop boundary, so treat it as untrusted — strip any
+            // directory components and force a .csv extension rather than trusting it as-is.
+            var safeName = Path.GetFileName(fileName);
+            if (string.IsNullOrWhiteSpace(safeName)) safeName = "table.csv";
+            if (!safeName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase)) safeName += ".csv";
+
+            var bytes = System.Text.Encoding.UTF8.GetBytes(csvContent);
+            using var stream = new MemoryStream(bytes);
+            await FileSaver.Default.SaveAsync(safeName, stream, default);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Export table CSV error: {ex.Message}");
+        }
+    }
+
     private bool _showPathInput;
     private string _pathInputValue = "";
 
