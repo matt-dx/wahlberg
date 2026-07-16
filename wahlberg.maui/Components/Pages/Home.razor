@@ -348,24 +348,27 @@
         _ = TabService.AddDocumentAsync(fileName, content);
     }
 
+    public sealed record TableCsvExportInfo(string FileName, bool IsServiceMode);
+
+    // Returns only the filename (plus the mode flag JS needs to decide how to save) — the CSV
+    // content itself never crosses this call, so a large table can't blow up a Blazor Server
+    // SignalR message the way a JS-to-.NET call carrying the full CSV string would.
     [JSInvokable]
-    public async Task ExportTableAsCsv(string csvContent, int tableIndex)
+    public TableCsvExportInfo GetTableCsvExportInfo(int tableIndex)
     {
         var doc = TabService.ActiveDocument;
         var baseName = doc is not null ? Path.GetFileNameWithoutExtension(doc.FileName) : "table";
-        var fileName = $"{baseName}-table-{tableIndex + 1}.csv";
+        return new TableCsvExportInfo($"{baseName}-table-{tableIndex + 1}.csv", AppMode.IsServiceMode);
+    }
 
+    // Native-only save path (service mode downloads the CSV as a browser Blob entirely in JS
+    // instead — see appInterop's table-export click handler).
+    [JSInvokable]
+    public async Task SaveTableCsv(string csvContent, string fileName)
+    {
         try
         {
             var bytes = System.Text.Encoding.UTF8.GetBytes(csvContent);
-
-            if (AppMode.IsServiceMode)
-            {
-                using var streamRef = new DotNetStreamReference(new MemoryStream(bytes));
-                await JS.InvokeVoidAsync("appInterop.downloadFileFromStream", fileName, streamRef);
-                return;
-            }
-
             using var stream = new MemoryStream(bytes);
             await FileSaver.Default.SaveAsync(fileName, stream, default);
         }

@@ -214,11 +214,20 @@ window.appInterop = {
             btn.title = 'Export as CSV';
             btn.setAttribute('aria-label', 'Export as CSV');
             btn.innerHTML = '<i class="bi bi-filetype-csv"></i>';
-            btn.addEventListener('click', function () {
+            btn.addEventListener('click', async function () {
                 if (!self._dotNetRef) return;
                 const csv = self._tableToCsv(table);
                 const tableIndex = Array.from(container.querySelectorAll('table')).indexOf(table);
-                self._dotNetRef.invokeMethodAsync('ExportTableAsCsv', csv, tableIndex);
+
+                // Only a filename crosses the wire here — in service mode the CSV itself never
+                // leaves the browser (avoids the large-SignalR-message risk SaveDiff avoids in
+                // the opposite direction); the native path saves via .NET's FileSaver instead.
+                const info = await self._dotNetRef.invokeMethodAsync('GetTableCsvExportInfo', tableIndex);
+                if (info.isServiceMode) {
+                    self._triggerDownload(info.fileName, new Blob([csv], { type: 'text/csv' }));
+                } else {
+                    await self._dotNetRef.invokeMethodAsync('SaveTableCsv', csv, info.fileName);
+                }
             });
 
             toolbar.appendChild(btn);
@@ -230,7 +239,14 @@ window.appInterop = {
         const lines = [];
         table.querySelectorAll('tr').forEach(function (row) {
             const fields = Array.from(row.querySelectorAll('th, td')).map(function (cell) {
-                const text = cell.textContent.replace(/\s+/g, ' ').trim();
+                // textContent alone drops <br> entirely (no "\n", no space) — replace it with
+                // a literal newline on a clone first so line breaks survive into the CSV field.
+                const clone = cell.cloneNode(true);
+                clone.querySelectorAll('br').forEach(function (br) { br.replaceWith('\n'); });
+
+                // Collapse runs of spaces/tabs, but keep the newlines from <br> above intact
+                // so the quoting below actually has a "\n" to quote.
+                const text = clone.textContent.replace(/[ \t]+/g, ' ').trim();
                 return /[",\r\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
             });
             lines.push(fields.join(','));
