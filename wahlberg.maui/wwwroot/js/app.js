@@ -216,17 +216,22 @@ window.appInterop = {
             btn.innerHTML = '<i class="bi bi-filetype-csv"></i>';
             btn.addEventListener('click', async function () {
                 if (!self._dotNetRef) return;
-                const csv = self._tableToCsv(table);
-                const tableIndex = Array.from(container.querySelectorAll('table')).indexOf(table);
+                try {
+                    const csv = self._tableToCsv(table);
+                    const tableIndex = Array.from(container.querySelectorAll('table')).indexOf(table);
 
-                // Only a filename crosses the wire here — in service mode the CSV itself never
-                // leaves the browser (avoids the large-SignalR-message risk SaveDiff avoids in
-                // the opposite direction); the native path saves via .NET's FileSaver instead.
-                const info = await self._dotNetRef.invokeMethodAsync('GetTableCsvExportInfo', tableIndex);
-                if (info.isServiceMode) {
-                    self._triggerDownload(info.fileName, new Blob([csv], { type: 'text/csv' }));
-                } else {
-                    await self._dotNetRef.invokeMethodAsync('SaveTableCsv', csv, info.fileName);
+                    // Only a filename crosses the wire here — in service mode the CSV itself
+                    // never leaves the browser (avoids the large-SignalR-message risk SaveDiff
+                    // avoids in the opposite direction); the native path saves via .NET's
+                    // FileSaver instead.
+                    const info = await self._dotNetRef.invokeMethodAsync('GetTableCsvExportInfo', tableIndex);
+                    if (info.isServiceMode) {
+                        self._triggerDownload(info.fileName, new Blob([csv], { type: 'text/csv' }));
+                    } else {
+                        await self._dotNetRef.invokeMethodAsync('SaveTableCsv', csv, info.fileName);
+                    }
+                } catch (e) {
+                    console.error('CSV export error:', e);
                 }
             });
 
