@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "wahlberg-serve",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "wahlberg.maui", "-f", "net10.0-windows10.0.19041.0", "--", "--serve", "--port", "5230"],
+      "port": 5230
+    }
+  ]
+}

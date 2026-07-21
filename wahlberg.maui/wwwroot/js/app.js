@@ -57,6 +57,13 @@ window.appInterop = {
             el.style.display = '';
         });
 
+        // Same story for the CSV export toolbars injected next to tables — Blazor's
+        // diffing doesn't know about them, so they'd otherwise survive a content refresh.
+        document.querySelectorAll('.table-export-toolbar').forEach(function (el) { el.remove(); });
+        document.querySelectorAll('table[data-csv-export-processed]').forEach(function (el) {
+            el.removeAttribute('data-csv-export-processed');
+        });
+
         this._setupScrollTracking();
         this._setupLinkHandling();
         this._renderDiff();
