@@ -29,7 +29,7 @@ public partial class ExportService
         // Front matter is metadata for the viewer, not document content — Pdf/Epub exports
         // should never include it (unlike the "Embedded Markdown" format above, which re-emits
         // the original Markdown source and rightly keeps it).
-        var (body, _) = FrontMatterParser.Extract(doc.Content);
+        var (body, _) = FrontMatterParser.Extract(doc.Content, includeHighlighting: false);
 
         var (sections, allHeadings) = await Task.Run(() =>
         {

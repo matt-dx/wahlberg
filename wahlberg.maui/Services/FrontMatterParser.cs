@@ -10,24 +10,27 @@ namespace Wahlberg.Services;
 /// </summary>
 public static class FrontMatterParser
 {
-    public static (string Body, FrontMatterInfo? FrontMatter) Extract(string content)
+    // includeHighlighting: false skips FrontMatterHighlighter entirely — export callers only
+    // need the stripped Body and discard FrontMatterInfo, so there's no reason to pay for
+    // tokenizing/allocating highlighted HTML on every PDF/EPUB export.
+    public static (string Body, FrontMatterInfo? FrontMatter) Extract(string content, bool includeHighlighting = true)
     {
         if (string.IsNullOrEmpty(content)) return (content, null);
 
-        if (TryExtractDelimited(content, "---", FrontMatterLanguage.Yaml, out var yamlBody, out var yamlInfo))
+        if (TryExtractDelimited(content, "---", FrontMatterLanguage.Yaml, includeHighlighting, out var yamlBody, out var yamlInfo))
             return (yamlBody, yamlInfo);
 
-        if (TryExtractDelimited(content, "+++", FrontMatterLanguage.Toml, out var tomlBody, out var tomlInfo))
+        if (TryExtractDelimited(content, "+++", FrontMatterLanguage.Toml, includeHighlighting, out var tomlBody, out var tomlInfo))
             return (tomlBody, tomlInfo);
 
-        if (TryExtractJson(content, out var jsonBody, out var jsonInfo))
+        if (TryExtractJson(content, includeHighlighting, out var jsonBody, out var jsonInfo))
             return (jsonBody, jsonInfo);
 
         return (content, null);
     }
 
     private static bool TryExtractDelimited(
-        string content, string delimiter, FrontMatterLanguage language,
+        string content, string delimiter, FrontMatterLanguage language, bool includeHighlighting,
         out string body, out FrontMatterInfo? frontMatter)
     {
         body = content;
@@ -59,7 +62,7 @@ public static class FrontMatterParser
                 {
                     Language = language,
                     Raw = raw,
-                    HighlightedHtml = FrontMatterHighlighter.Highlight(raw, language)
+                    HighlightedHtml = includeHighlighting ? FrontMatterHighlighter.Highlight(raw, language) : string.Empty
                 };
                 return true;
             }
@@ -74,7 +77,7 @@ public static class FrontMatterParser
     // JSON front matter has no delimiter line of its own — the object literal itself is the
     // block, so the end is found by brace-counting (skipping braces inside string literals)
     // rather than scanning for a marker line.
-    private static bool TryExtractJson(string content, out string body, out FrontMatterInfo? frontMatter)
+    private static bool TryExtractJson(string content, bool includeHighlighting, out string body, out FrontMatterInfo? frontMatter)
     {
         body = content;
         frontMatter = null;
@@ -118,6 +121,13 @@ public static class FrontMatterParser
         if (endIndex < 0) return false; // unbalanced — treat as ordinary Markdown, not front matter
 
         var raw = content[..(endIndex + 1)];
+
+        // Brace-balance alone isn't enough to tell real JSON front matter apart from Markdig's
+        // generic-attribute syntax (e.g. a "{#id}" or "{.class}" opening a document) — both
+        // balance cleanly. Require the object to actually look like JSON: empty, or its first
+        // key is a quoted string.
+        if (!LooksLikeJsonObject(raw)) return false;
+
         var bodyStart = endIndex + 1;
         if (bodyStart < content.Length && content[bodyStart] == '\r') bodyStart++;
         if (bodyStart < content.Length && content[bodyStart] == '\n') bodyStart++;
@@ -127,9 +137,15 @@ public static class FrontMatterParser
         {
             Language = FrontMatterLanguage.Json,
             Raw = raw,
-            HighlightedHtml = FrontMatterHighlighter.Highlight(raw, FrontMatterLanguage.Json)
+            HighlightedHtml = includeHighlighting ? FrontMatterHighlighter.Highlight(raw, FrontMatterLanguage.Json) : string.Empty
         };
         return true;
+    }
+
+    private static bool LooksLikeJsonObject(string raw)
+    {
+        var inner = raw[1..^1].TrimStart();
+        return inner.Length == 0 || inner[0] == '"';
     }
 
     private static string TrimTrailingLineEnding(string s)
