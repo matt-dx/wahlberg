@@ -472,8 +472,12 @@ public partial class TabService : IDisposable
             doc.Content = content;
             doc.HtmlContent = html;
             doc.Headings = headings;
-            // FrontMatterExpanded is left untouched — an external edit shouldn't collapse or
-            // expand a bar the user already toggled for this tab.
+            // Preserve the user's toggle only while front matter keeps existing across the
+            // reload — an external edit shouldn't collapse/expand a bar that's still there.
+            // But if front matter was just removed, reset it: otherwise a later edit that
+            // re-adds front matter would reappear already expanded instead of collapsed, which
+            // contradicts the "collapsed by default" behavior for newly-present front matter.
+            if (frontMatter is null) doc.FrontMatterExpanded = false;
             doc.FrontMatter = frontMatter;
             doc.ReloadVersion++;
         }
