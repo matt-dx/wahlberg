@@ -13,6 +13,9 @@ public class MarkdownDocument
     /// <summary>Bumped whenever content is reloaded from disk, so the UI can detect an in-place refresh even though <see cref="Id"/> stays the same.</summary>
     public int ReloadVersion { get; set; }
 
+    public FrontMatterInfo? FrontMatter { get; set; }
+    public bool FrontMatterExpanded { get; set; } = false;
+
     public bool IsDiff { get; init; } = false;
     public string? DiffLeftLabel { get; init; }
     public string? DiffRightLabel { get; init; }

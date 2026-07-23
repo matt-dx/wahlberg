@@ -26,13 +26,18 @@ public partial class ExportService
 
         var docDir = Path.GetDirectoryName(doc.FilePath) ?? "";
 
+        // Front matter is metadata for the viewer, not document content — Pdf/Epub exports
+        // should never include it (unlike the "Embedded Markdown" format above, which re-emits
+        // the original Markdown source and rightly keeps it).
+        var (body, _) = FrontMatterParser.Extract(doc.Content);
+
         var (sections, allHeadings) = await Task.Run(() =>
         {
-            var secs = SplitContent(doc.Content, _pipeline, options.SplitOnHorizontalRule, options.SplitAtHeadingLevel);
+            var secs = SplitContent(body, _pipeline, options.SplitOnHorizontalRule, options.SplitAtHeadingLevel);
             for (var i = 0; i < secs.Count; i++)
                 secs[i] = new ExportSection { Heading = secs[i].Heading, Html = InlineImagesAsDataUris(secs[i].Html, docDir) };
 
-            var headings = options.IncludeToc ? ExtractAllHeadings(doc.Content, _pipeline) : [];
+            var headings = options.IncludeToc ? ExtractAllHeadings(body, _pipeline) : [];
             return (secs, headings);
         });
 

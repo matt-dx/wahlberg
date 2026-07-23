@@ -169,14 +169,7 @@ public partial class TabService : IDisposable
         }
         var newDoc = doc!;
 
-        var (html, headings) = await Task.Run(() =>
-        {
-            var rawHtml = Markdown.ToHtml(content, _pipeline);
-            var docDir = Path.GetDirectoryName(filePath);
-            if (!string.IsNullOrEmpty(docDir))
-                rawHtml = ResolveLocalPaths(rawHtml, docDir);
-            return (rawHtml, ExtractHeadings(rawHtml));
-        });
+        var (html, headings, frontMatter) = await Task.Run(() => RenderDocument(content, filePath));
 
         bool stillOpen;
         lock (_docsLock)
@@ -186,6 +179,7 @@ public partial class TabService : IDisposable
             {
                 newDoc.HtmlContent = html;
                 newDoc.Headings = headings;
+                newDoc.FrontMatter = frontMatter;
                 newDoc.IsLoading = false;
             }
         }
@@ -458,14 +452,7 @@ public partial class TabService : IDisposable
             if (content == doc.Content) return;
         }
 
-        var (html, headings) = await Task.Run(() =>
-        {
-            var rawHtml = Markdown.ToHtml(content, _pipeline);
-            var docDir = Path.GetDirectoryName(filePath);
-            if (!string.IsNullOrEmpty(docDir))
-                rawHtml = ResolveLocalPaths(rawHtml, docDir);
-            return (rawHtml, ExtractHeadings(rawHtml));
-        });
+        var (html, headings, frontMatter) = await Task.Run(() => RenderDocument(content, filePath));
 
         lock (_watcherStateLock)
         {
@@ -485,6 +472,9 @@ public partial class TabService : IDisposable
             doc.Content = content;
             doc.HtmlContent = html;
             doc.Headings = headings;
+            // FrontMatterExpanded is left untouched — an external edit shouldn't collapse or
+            // expand a bar the user already toggled for this tab.
+            doc.FrontMatter = frontMatter;
             doc.ReloadVersion++;
         }
         StateChanged?.Invoke();
@@ -565,6 +555,21 @@ public partial class TabService : IDisposable
     {
         public List<string> OpenFiles { get; set; } = [];
         public string? ActiveFile { get; set; }
+    }
+
+    /// <summary>
+    /// Shared by <see cref="AddDocumentAsync"/> and <see cref="ReloadDocumentFromDiskAsync"/>:
+    /// splits off any front matter, renders the remaining Markdown body, resolves local image
+    /// paths, and extracts headings from the rendered HTML. Runs off the UI thread.
+    /// </summary>
+    private (string Html, List<HeadingInfo> Headings, FrontMatterInfo? FrontMatter) RenderDocument(string content, string filePath)
+    {
+        var (body, frontMatter) = FrontMatterParser.Extract(content);
+        var rawHtml = Markdown.ToHtml(body, _pipeline);
+        var docDir = Path.GetDirectoryName(filePath);
+        if (!string.IsNullOrEmpty(docDir))
+            rawHtml = ResolveLocalPaths(rawHtml, docDir);
+        return (rawHtml, ExtractHeadings(rawHtml), frontMatter);
     }
 
     private static List<HeadingInfo> ExtractHeadings(string html)

@@ -158,6 +158,21 @@
                 else
                 {
                     <div class="document-content">
+                        @if (activeDoc.FrontMatter is not null)
+                        {
+                            <div class="frontmatter-bar">
+                                <button class="frontmatter-toggle" @onclick="() => ToggleFrontMatter(activeDoc)"
+                                        title="@(activeDoc.FrontMatterExpanded ? "Collapse front matter" : "Expand front matter")">
+                                    <i class="bi @(activeDoc.FrontMatterExpanded ? "bi-chevron-down" : "bi-chevron-right")"></i>
+                                    <span class="frontmatter-label">Front Matter</span>
+                                    <span class="frontmatter-lang">@activeDoc.FrontMatter.Language.ToString().ToUpperInvariant()</span>
+                                </button>
+                                @if (activeDoc.FrontMatterExpanded)
+                                {
+                                    <pre class="frontmatter-content"><code>@((MarkupString)activeDoc.FrontMatter.HighlightedHtml)</code></pre>
+                                }
+                            </div>
+                        }
                         <div class="markdown-body">
                             @((MarkupString)activeDoc.HtmlContent)
                         </div>
@@ -467,6 +482,12 @@
     }
 
     private void ToggleToc() => _tocVisible = !_tocVisible;
+
+    private void ToggleFrontMatter(MarkdownDocument doc)
+    {
+        doc.FrontMatterExpanded = !doc.FrontMatterExpanded;
+        StateHasChanged();
+    }
 
     private void ToggleSettings() => _settingsVisible = !_settingsVisible;
 
