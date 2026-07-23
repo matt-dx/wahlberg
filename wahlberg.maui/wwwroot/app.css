@@ -785,7 +785,10 @@ body.drag-over::after {
 .frontmatter-bar {
     position: sticky;
     top: 0;
-    z-index: 1;
+    /* Above .markdown-body thead th's sticky z-index (2) — the bar sits at the very top of
+       the document and must stay clickable above any in-document sticky table header that
+       scrolls beneath it. */
+    z-index: 3;
     background: var(--theme-surface, #252526);
     border-bottom: 1px solid var(--theme-border, #333);
 }
@@ -842,8 +845,8 @@ body.drag-over::after {
 .fm-string { color: #ce9178; }
 .fm-number { color: #b5cea8; }
 .fm-boolean { color: #569cd6; }
-.fm-comment { color: var(--theme-text, #6a9955); font-style: italic; }
-.fm-punct { color: var(--theme-text, #999); }
+.fm-comment { color: #6a9955; font-style: italic; }
+.fm-punct { color: #999; }
 .fm-section { color: #c586c0; font-weight: 600; }
 
 /* ===== Loading State ===== */
