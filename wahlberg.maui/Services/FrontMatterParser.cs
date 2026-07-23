@@ -46,25 +46,23 @@ public static class FrontMatterParser
         if (!content.StartsWith(delimiter, StringComparison.Ordinal))
             return false;
 
-        var firstLineEnd = content.IndexOf('\n', delimiter.Length);
-        if (firstLineEnd < 0) return false;
+        var (firstLineEnd, afterFirstLine) = FindLineEnd(content, delimiter.Length);
+        if (afterFirstLine == firstLineEnd) return false; // no line terminator at all — single-line file
 
         // The opening line must be the delimiter alone (rules out "----" or a "---" that's
         // actually part of some other construct on the same line).
-        if (content[..firstLineEnd].TrimEnd('\r') != delimiter) return false;
+        if (content[..firstLineEnd] != delimiter) return false;
 
-        var searchStart = firstLineEnd + 1;
+        var searchStart = afterFirstLine;
         for (var lineCount = 0; searchStart <= content.Length && lineCount < MaxFrontMatterLines; lineCount++)
         {
-            var lineEnd = content.IndexOf('\n', searchStart);
-            var lineEndExclusive = lineEnd < 0 ? content.Length : lineEnd;
-            var line = content[searchStart..lineEndExclusive].TrimEnd('\r');
+            var (lineEnd, nextStart) = FindLineEnd(content, searchStart);
+            var line = content[searchStart..lineEnd];
 
             if (line == delimiter)
             {
-                var raw = TrimTrailingLineEnding(content[(firstLineEnd + 1)..searchStart]);
-                var bodyStart = lineEnd < 0 ? content.Length : lineEnd + 1;
-                body = content[bodyStart..];
+                var raw = TrimTrailingLineEnding(content[afterFirstLine..searchStart]);
+                body = content[nextStart..];
                 frontMatter = new FrontMatterInfo
                 {
                     Language = language,
@@ -74,11 +72,26 @@ public static class FrontMatterParser
                 return true;
             }
 
-            if (lineEnd < 0) break; // reached end of file without finding a closing delimiter
-            searchStart = lineEnd + 1;
+            if (nextStart == lineEnd) break; // reached end of file without finding a closing delimiter
+            searchStart = nextStart;
         }
 
         return false;
+    }
+
+    // Finds the next line terminator starting at `start`, recognizing "\n", "\r\n", and a lone
+    // "\r" (legacy Mac-style) alike, so front-matter detection isn't tied to one newline style.
+    // Returns (index the line's text ends at, index the following line starts at) — both equal
+    // to content.Length when there's no more terminator (i.e. this is the final, unterminated line).
+    private static (int LineEnd, int NextStart) FindLineEnd(string content, int start)
+    {
+        for (var i = start; i < content.Length; i++)
+        {
+            if (content[i] == '\n') return (i, i + 1);
+            if (content[i] == '\r')
+                return (i, i + 1 < content.Length && content[i + 1] == '\n' ? i + 2 : i + 1);
+        }
+        return (content.Length, content.Length);
     }
 
     // JSON front matter has no delimiter line of its own — the object literal itself is the
