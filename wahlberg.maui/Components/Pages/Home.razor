@@ -158,6 +158,23 @@
                 else
                 {
                     <div class="document-content">
+                        @{ var frontMatter = activeDoc.FrontMatter; }
+                        @if (frontMatter is not null)
+                        {
+                            <div class="frontmatter-bar">
+                                <button type="button" class="frontmatter-toggle" @onclick="() => ToggleFrontMatter(activeDoc)"
+                                        title="@(activeDoc.FrontMatterExpanded ? "Collapse front matter" : "Expand front matter")"
+                                        aria-expanded="@(activeDoc.FrontMatterExpanded ? "true" : "false")">
+                                    <i class="bi @(activeDoc.FrontMatterExpanded ? "bi-chevron-down" : "bi-chevron-right")"></i>
+                                    <span class="frontmatter-label">Front Matter</span>
+                                    <span class="frontmatter-lang">@frontMatter.Language.ToString().ToUpperInvariant()</span>
+                                </button>
+                                @if (activeDoc.FrontMatterExpanded)
+                                {
+                                    <pre class="frontmatter-content"><code>@((MarkupString)frontMatter.HighlightedHtml)</code></pre>
+                                }
+                            </div>
+                        }
                         <div class="markdown-body">
                             @((MarkupString)activeDoc.HtmlContent)
                         </div>
@@ -467,6 +484,12 @@
     }
 
     private void ToggleToc() => _tocVisible = !_tocVisible;
+
+    private void ToggleFrontMatter(MarkdownDocument doc)
+    {
+        doc.FrontMatterExpanded = !doc.FrontMatterExpanded;
+        StateHasChanged();
+    }
 
     private void ToggleSettings() => _settingsVisible = !_settingsVisible;
 
