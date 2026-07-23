@@ -158,7 +158,8 @@
                 else
                 {
                     <div class="document-content">
-                        @if (activeDoc.FrontMatter is not null)
+                        @{ var frontMatter = activeDoc.FrontMatter; }
+                        @if (frontMatter is not null)
                         {
                             <div class="frontmatter-bar">
                                 <button type="button" class="frontmatter-toggle" @onclick="() => ToggleFrontMatter(activeDoc)"
@@ -166,11 +167,11 @@
                                         aria-expanded="@(activeDoc.FrontMatterExpanded ? "true" : "false")">
                                     <i class="bi @(activeDoc.FrontMatterExpanded ? "bi-chevron-down" : "bi-chevron-right")"></i>
                                     <span class="frontmatter-label">Front Matter</span>
-                                    <span class="frontmatter-lang">@activeDoc.FrontMatter.Language.ToString().ToUpperInvariant()</span>
+                                    <span class="frontmatter-lang">@frontMatter.Language.ToString().ToUpperInvariant()</span>
                                 </button>
                                 @if (activeDoc.FrontMatterExpanded)
                                 {
-                                    <pre class="frontmatter-content"><code>@((MarkupString)activeDoc.FrontMatter.HighlightedHtml)</code></pre>
+                                    <pre class="frontmatter-content"><code>@((MarkupString)frontMatter.HighlightedHtml)</code></pre>
                                 }
                             </div>
                         }

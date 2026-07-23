@@ -184,8 +184,19 @@ public static class FrontMatterHighlighter
         return sb.ToString();
     }
 
-    private static bool MatchesKeyword(string s, int index, string keyword) =>
-        index + keyword.Length <= s.Length && string.CompareOrdinal(s, index, keyword, 0, keyword.Length) == 0;
+    // Token-boundary aware: without this, "true"/"false"/"null" would match as a prefix or
+    // substring inside a longer bare word (e.g. "trueValue" or "xtrue") instead of only as a
+    // standalone JSON literal.
+    private static bool MatchesKeyword(string s, int index, string keyword)
+    {
+        if (index + keyword.Length > s.Length) return false;
+        if (string.CompareOrdinal(s, index, keyword, 0, keyword.Length) != 0) return false;
+        if (index > 0 && IsWordChar(s[index - 1])) return false;
+        var afterIndex = index + keyword.Length;
+        return afterIndex >= s.Length || !IsWordChar(s[afterIndex]);
+    }
+
+    private static bool IsWordChar(char c) => char.IsLetterOrDigit(c) || c == '_';
 
     // ===== Shared scalar-value handling (YAML/TOML) =====
 
