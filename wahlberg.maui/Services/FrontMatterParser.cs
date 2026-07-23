@@ -10,6 +10,13 @@ namespace Wahlberg.Services;
 /// </summary>
 public static class FrontMatterParser
 {
+    // Bounds the closing-delimiter search for YAML/TOML — without this, a document that opens
+    // with a Markdown thematic break ("---") and later contains an unrelated "---" further down
+    // (another thematic break, a setext heading underline, etc.) would have that entire leading
+    // section mistaken for front matter. Real front matter blocks are always small, so anything
+    // beyond this many lines without a closing delimiter is treated as ordinary Markdown instead.
+    private const int MaxFrontMatterLines = 200;
+
     // includeHighlighting: false skips FrontMatterHighlighter entirely — export callers only
     // need the stripped Body and discard FrontMatterInfo, so there's no reason to pay for
     // tokenizing/allocating highlighted HTML on every PDF/EPUB export.
@@ -47,7 +54,7 @@ public static class FrontMatterParser
         if (content[..firstLineEnd].TrimEnd('\r') != delimiter) return false;
 
         var searchStart = firstLineEnd + 1;
-        while (searchStart <= content.Length)
+        for (var lineCount = 0; searchStart <= content.Length && lineCount < MaxFrontMatterLines; lineCount++)
         {
             var lineEnd = content.IndexOf('\n', searchStart);
             var lineEndExclusive = lineEnd < 0 ? content.Length : lineEnd;
