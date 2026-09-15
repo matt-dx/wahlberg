@@ -57,12 +57,20 @@
     @{ var openDocs = TabService.GetOpenDocumentsSnapshot(); }
     @if (openDocs.Count > 0)
     {
-        <div class="tab-strip">
+        <div class="tab-strip" role="tablist" aria-orientation="@(TabService.Orientation == TabOrientation.Vertical ? "vertical" : "horizontal")">
             @foreach (var doc in openDocs)
             {
                 <div class="tab @(doc == activeDoc ? "active" : "")"
+                     @key="doc.Id"
+                     draggable="true"
+                     data-doc-id="@doc.Id"
                      @onclick="() => TabService.SetActiveDocument(doc)">
-                    <span class="tab-title" title="@doc.FilePath">@doc.FileName</span>
+                    <span class="tab-title"
+                          title="@doc.FilePath"
+                          role="tab"
+                          aria-selected="@(doc == activeDoc ? "true" : "false")"
+                          tabindex="0"
+                          @onkeydown="e => OnTabKeyDown(e, doc)">@doc.FileName</span>
                     <button class="tab-close" @onclick="() => CloseTab(doc)" @onclick:stopPropagation="true" title="Close"><i class="bi bi-x"></i></button>
                 </div>
             }
@@ -276,6 +284,11 @@
         {
             await JS.InvokeVoidAsync("appInterop.applyTheme", ThemeService.ActiveTheme);
             await JS.InvokeVoidAsync("appInterop.initDropZone", _dotNetRef);
+            // Only the native Windows (WinUI/WebView2) shell has the broken-native-drag bug —
+            // see the comment on enableWebView2DragPolyfillIfNeeded in app.js.
+            var needsDragPolyfill = OperatingSystem.IsWindows() && !AppMode.IsServiceMode;
+            await JS.InvokeVoidAsync("appInterop.enableWebView2DragPolyfillIfNeeded", needsDragPolyfill);
+            await JS.InvokeVoidAsync("appInterop.initTabDragDrop", _dotNetRef);
         }
 
         var doc = TabService.ActiveDocument;
@@ -475,6 +488,59 @@
         TabService.CloseDocument(doc);
         _lastProcessedDocId = null;
         _lastProcessedReloadVersion = -1;
+    }
+
+    /// <summary>
+    /// Called from app.js's document-level drag handlers once, at drop — tab drag-and-drop
+    /// visuals and hit-testing are handled entirely in JS so a Blazor Server round trip isn't
+    /// needed on every dragover (which fires continuously while the mouse moves and previously
+    /// caused enough re-renders mid-drag to make the browser lose track of the drop target).
+    /// </summary>
+    [JSInvokable]
+    public void OnTabDropped(string draggedId, string? targetId)
+    {
+        if (!Guid.TryParse(draggedId, out var draggedGuid)) return;
+
+        var docs = TabService.GetOpenDocumentsSnapshot();
+        var dragged = docs.FirstOrDefault(d => d.Id == draggedGuid);
+        if (dragged is null) return;
+
+        MarkdownDocument? target = null;
+        if (targetId is not null && Guid.TryParse(targetId, out var targetGuid))
+            target = docs.FirstOrDefault(d => d.Id == targetGuid);
+
+        TabService.ReorderDocument(dragged, target);
+    }
+
+    /// <summary>
+    /// Keyboard alternative to the mouse-only drag reorder above: Ctrl+Alt+Left/Right moves
+    /// the focused tab, Enter/Space activates it — Ctrl+Alt (rather than the more common
+    /// bare Alt+Left/Right) avoids colliding with the browser's own back/forward shortcut.
+    /// </summary>
+    private void OnTabKeyDown(KeyboardEventArgs e, MarkdownDocument doc)
+    {
+        if (e.CtrlKey && e.AltKey && e.Key == "ArrowLeft") { MoveTab(doc, -1); return; }
+        if (e.CtrlKey && e.AltKey && e.Key == "ArrowRight") { MoveTab(doc, 1); return; }
+        if (e.Key is "Enter" or " ") TabService.SetActiveDocument(doc);
+    }
+
+    private void MoveTab(MarkdownDocument doc, int direction)
+    {
+        var docs = TabService.GetOpenDocumentsSnapshot();
+        var index = docs.ToList().IndexOf(doc);
+        if (index < 0) return;
+
+        if (direction < 0)
+        {
+            if (index == 0) return;
+            TabService.ReorderDocument(doc, docs[index - 1]);
+        }
+        else
+        {
+            if (index >= docs.Count - 1) return;
+            var target = index + 2 < docs.Count ? docs[index + 2] : null;
+            TabService.ReorderDocument(doc, target);
+        }
     }
 
     private void EditCurrentFile()

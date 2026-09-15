@@ -43,6 +43,14 @@ public partial class TabService : IDisposable
     // deadlock.
     private readonly object _docsLock = new();
 
+    // Serializes SaveSessionAsync so overlapping calls (e.g. several quick drag-to-reorder
+    // drops) write session.json one at a time instead of racing — an interleaved write could
+    // corrupt the file, and an out-of-order one could leave a stale tab order persisted even
+    // though the UI already moved on. Each call still snapshots _openDocuments fresh when its
+    // turn comes, so a call queued behind a newer one just redundantly re-writes the same
+    // (already current) state rather than losing it.
+    private readonly SemaphoreSlim _saveSessionLock = new(1, 1);
+
     private readonly List<MarkdownDocument> _openDocuments = [];
     public MarkdownDocument? ActiveDocument { get; private set; }
     public TabOrientation Orientation { get; set; } = TabOrientation.Horizontal;
@@ -243,6 +251,28 @@ public partial class TabService : IDisposable
         lock (_docsLock)
         {
             SetActive(doc);
+        }
+        StateChanged?.Invoke();
+        _ = SaveSessionAsync();
+    }
+
+    /// <summary>
+    /// Moves <paramref name="doc"/> to sit just before <paramref name="target"/> in the tab
+    /// order (or to the end, if <paramref name="target"/> is null) — drives drag-and-drop tab
+    /// reordering. The new order is persisted so it survives a restart.
+    /// </summary>
+    public void ReorderDocument(MarkdownDocument doc, MarkdownDocument? target)
+    {
+        lock (_docsLock)
+        {
+            if (doc == target) return;
+            if (!_openDocuments.Remove(doc)) return;
+
+            var insertAt = target is null ? -1 : _openDocuments.IndexOf(target);
+            if (insertAt < 0)
+                _openDocuments.Add(doc);
+            else
+                _openDocuments.Insert(insertAt, doc);
         }
         StateChanged?.Invoke();
         _ = SaveSessionAsync();
@@ -520,10 +550,18 @@ public partial class TabService : IDisposable
             _pendingReloads.Clear();
             _reloadGenerations.Clear();
         }
+
+        // Deliberately not disposed: SaveSessionAsync calls are fire-and-forget, so one could
+        // still be queued on or holding this semaphore when Dispose runs, and disposing out
+        // from under it would throw ObjectDisposedException from WaitAsync or the finally
+        // block's Release — potentially dropping the last-persisted tab order. SemaphoreSlim
+        // only allocates an OS handle if AvailableWaitHandle is touched (it never is here), so
+        // leaving it for this singleton's lifetime costs nothing.
     }
 
     private async Task SaveSessionAsync()
     {
+        await _saveSessionLock.WaitAsync();
         try
         {
             List<string> openRealFiles;
@@ -552,6 +590,10 @@ public partial class TabService : IDisposable
         catch
         {
             // Non-critical — silently ignore
+        }
+        finally
+        {
+            _saveSessionLock.Release();
         }
     }
 
