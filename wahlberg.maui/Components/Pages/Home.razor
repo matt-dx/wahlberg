@@ -57,10 +57,11 @@
     @{ var openDocs = TabService.GetOpenDocumentsSnapshot(); }
     @if (openDocs.Count > 0)
     {
-        <div class="tab-strip" role="tablist">
+        <div class="tab-strip" role="tablist" aria-orientation="@(TabService.Orientation == TabOrientation.Vertical ? "vertical" : "horizontal")">
             @foreach (var doc in openDocs)
             {
                 <div class="tab @(doc == activeDoc ? "active" : "")"
+                     @key="doc.Id"
                      draggable="true"
                      data-doc-id="@doc.Id"
                      @onclick="() => TabService.SetActiveDocument(doc)">
