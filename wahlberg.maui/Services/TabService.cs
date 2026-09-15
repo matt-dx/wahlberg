@@ -551,7 +551,12 @@ public partial class TabService : IDisposable
             _reloadGenerations.Clear();
         }
 
-        _saveSessionLock.Dispose();
+        // Deliberately not disposed: SaveSessionAsync calls are fire-and-forget, so one could
+        // still be queued on or holding this semaphore when Dispose runs, and disposing out
+        // from under it would throw ObjectDisposedException from WaitAsync or the finally
+        // block's Release — potentially dropping the last-persisted tab order. SemaphoreSlim
+        // only allocates an OS handle if AvailableWaitHandle is touched (it never is here), so
+        // leaving it for this singleton's lifetime costs nothing.
     }
 
     private async Task SaveSessionAsync()

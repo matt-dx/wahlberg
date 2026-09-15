@@ -121,6 +121,15 @@ window.appInterop = {
             if (e.target.closest('.tab-close')) e.stopImmediatePropagation();
         }, true);
 
+        // Blazor's @onkeydown:preventDefault directive is decided once per render, not per
+        // keystroke, so it can't conditionally suppress only Space while leaving Tab and other
+        // keys alone — Space is the browser's default page-scroll key on any focusable
+        // non-form element (like the tabindex="0" .tab-title span), so without this, using it
+        // to activate a tab also scrolls the page.
+        document.addEventListener('keydown', function (e) {
+            if (e.key === ' ' && e.target.closest('.tab-title')) e.preventDefault();
+        });
+
         document.addEventListener('dragstart', function (e) {
             // draggable="true" on .tab makes its whole subtree a drag source — including the
             // nested close button — so a native (non-polyfilled) drag can still start there.

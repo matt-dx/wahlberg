@@ -63,12 +63,13 @@
                 <div class="tab @(doc == activeDoc ? "active" : "")"
                      draggable="true"
                      data-doc-id="@doc.Id"
-                     role="tab"
-                     aria-selected="@(doc == activeDoc ? "true" : "false")"
-                     tabindex="0"
-                     @onclick="() => TabService.SetActiveDocument(doc)"
-                     @onkeydown="e => OnTabKeyDown(e, doc)">
-                    <span class="tab-title" title="@doc.FilePath">@doc.FileName</span>
+                     @onclick="() => TabService.SetActiveDocument(doc)">
+                    <span class="tab-title"
+                          title="@doc.FilePath"
+                          role="tab"
+                          aria-selected="@(doc == activeDoc ? "true" : "false")"
+                          tabindex="0"
+                          @onkeydown="e => OnTabKeyDown(e, doc)">@doc.FileName</span>
                     <button class="tab-close" @onclick="() => CloseTab(doc)" @onclick:stopPropagation="true" title="Close"><i class="bi bi-x"></i></button>
                 </div>
             }
