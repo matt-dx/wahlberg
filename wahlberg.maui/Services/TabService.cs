@@ -248,6 +248,28 @@ public partial class TabService : IDisposable
         _ = SaveSessionAsync();
     }
 
+    /// <summary>
+    /// Moves <paramref name="doc"/> to sit just before <paramref name="target"/> in the tab
+    /// order (or to the end, if <paramref name="target"/> is null) — drives drag-and-drop tab
+    /// reordering. The new order is persisted so it survives a restart.
+    /// </summary>
+    public void ReorderDocument(MarkdownDocument doc, MarkdownDocument? target)
+    {
+        lock (_docsLock)
+        {
+            if (doc == target) return;
+            if (!_openDocuments.Remove(doc)) return;
+
+            var insertAt = target is null ? -1 : _openDocuments.IndexOf(target);
+            if (insertAt < 0)
+                _openDocuments.Add(doc);
+            else
+                _openDocuments.Insert(insertAt, doc);
+        }
+        StateChanged?.Invoke();
+        _ = SaveSessionAsync();
+    }
+
     public void CloseDocument(MarkdownDocument doc)
     {
         lock (_docsLock)

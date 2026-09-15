@@ -3,6 +3,8 @@ window.appInterop = {
     _linkClickHandler: null,
     _dotNetRef: null,
     _dropDotNetRef: null,
+    _tabDropDotNetRef: null,
+    _draggedTabId: null,
     _lastActiveId: '',
 
     applyTheme: function (theme) {
@@ -28,21 +30,131 @@ window.appInterop = {
     initDropZone: function (dotNetRef) {
         this._dropDotNetRef = dotNetRef;
 
-        // Visual feedback only — MAUI's DropGestureRecognizer handles actual file opening
+        // Visual feedback only — MAUI's DropGestureRecognizer handles actual file opening.
+        // The webview2-dnd-polyfill (see enableWebView2DragPolyfillIfNeeded) simulates a tab
+        // drag by dispatching plain Event objects of these same types, which also bubble to
+        // document — instanceof DragEvent excludes those so an in-page tab drag doesn't light
+        // up the "you're dropping a file" overlay.
         document.addEventListener('dragover', function (e) {
+            if (!(e instanceof DragEvent)) return;
             e.preventDefault();
             document.body.classList.add('drag-over');
         });
 
         document.addEventListener('dragleave', function (e) {
+            if (!(e instanceof DragEvent)) return;
             if (e.relatedTarget === null) {
                 document.body.classList.remove('drag-over');
             }
         });
 
         document.addEventListener('drop', function (e) {
+            if (!(e instanceof DragEvent)) return;
             e.preventDefault();
             document.body.classList.remove('drag-over');
+        });
+    },
+
+    // Native HTML5 drag-and-drop is broken inside a WinUI3-hosted WebView2: dragstart fires
+    // but dragover/drop never do, so the OS-level drag session dies before it can go anywhere
+    // (confirmed via WebView2 DevTools; tracked upstream as dotnet/maui#2205 and
+    // microsoft-ui-xaml#10576, both still open/blocked on WebView2 itself). The vendored
+    // mouse-event polyfill in webview2-dnd-polyfill.js works around it by simulating the whole
+    // drag from mousedown/mousemove/mouseup instead of relying on the native drag session —
+    // load it only for that shell; real browsers (including this app's own --serve mode) and
+    // other platforms' WebViews don't have the bug and should keep using native drag.
+    enableWebView2DragPolyfillIfNeeded: function (needed) {
+        if (!needed) return;
+        if (document.querySelector('script[data-webview2-dnd-polyfill]')) return;
+        const script = document.createElement('script');
+        script.src = 'js/webview2-dnd-polyfill.js';
+        script.dataset.webview2DndPolyfill = 'true';
+        document.head.appendChild(script);
+    },
+
+    // Tab reordering runs entirely client-side (drag visuals + hit-testing) and only calls
+    // back into .NET once, at drop — binding every dragover to a Blazor Server round trip
+    // fires on every pixel of mouse movement and the resulting re-renders were enough to make
+    // the browser lose track of the actual drop target mid-drag. Delegated on `document` (like
+    // initDropZone) rather than the tab strip itself, since that element doesn't exist until
+    // at least one tab is open and gets recreated whenever the last tab closes and reopens.
+    initTabDragDrop: function (dotNetRef) {
+        if (this._tabDragDropInitialized) {
+            this._tabDropDotNetRef = dotNetRef;
+            return;
+        }
+        this._tabDragDropInitialized = true;
+        this._tabDropDotNetRef = dotNetRef;
+        const self = this;
+
+        const clearDragOver = function () {
+            document.querySelectorAll('.tab.drag-over').forEach(function (el) { el.classList.remove('drag-over'); });
+        };
+
+        document.addEventListener('dragstart', function (e) {
+            const tab = e.target.closest('.tab');
+            if (!tab) return;
+            self._draggedTabId = tab.dataset.docId;
+            tab.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            // Chromium doesn't strictly require data for a same-page drag, but some browsers
+            // refuse to start the drag at all without it.
+            try { e.dataTransfer.setData('text/plain', tab.dataset.docId); } catch { /* best-effort */ }
+        });
+
+        // e.target on a dragover/drop event can lag behind the pointer's actual position
+        // (observed during a fast/long drag) — elementFromPoint at the event's own
+        // coordinates is the authoritative source for what's really under the cursor. But the
+        // webview2-dnd-polyfill's synthetic 'drop' event (unlike its 'dragover') never sets
+        // clientX/clientY, so elementFromPoint(0, 0) would resolve to whatever's in the
+        // top-left corner instead — fall back to e.target in that case, which the polyfill
+        // already dispatches on the correct element.
+        const elementAt = function (e) {
+            if (e.clientX || e.clientY) {
+                const el = document.elementFromPoint(e.clientX, e.clientY);
+                if (el) return el;
+            }
+            return e.target;
+        };
+
+        document.addEventListener('dragover', function (e) {
+            if (!self._draggedTabId) return;
+            const el = elementAt(e);
+            const strip = el && el.closest('.tab-strip');
+            if (!strip) return;
+            e.preventDefault();
+
+            clearDragOver();
+            const tab = el.closest('.tab');
+            if (tab && tab.dataset.docId !== self._draggedTabId) {
+                tab.classList.add('drag-over');
+            }
+        });
+
+        document.addEventListener('drop', function (e) {
+            if (!self._draggedTabId) return;
+            const el = elementAt(e);
+            const strip = el && el.closest('.tab-strip');
+            if (!strip) return;
+            e.preventDefault();
+
+            const tab = el.closest('.tab');
+            const targetId = (tab && tab.dataset.docId !== self._draggedTabId) ? tab.dataset.docId : null;
+            const draggedId = self._draggedTabId;
+
+            clearDragOver();
+            document.querySelectorAll('.tab.dragging').forEach(function (el) { el.classList.remove('dragging'); });
+            self._draggedTabId = null;
+
+            if (self._tabDropDotNetRef) {
+                self._tabDropDotNetRef.invokeMethodAsync('OnTabDropped', draggedId, targetId);
+            }
+        });
+
+        document.addEventListener('dragend', function () {
+            self._draggedTabId = null;
+            clearDragOver();
+            document.querySelectorAll('.tab.dragging').forEach(function (el) { el.classList.remove('dragging'); });
         });
     },
 
@@ -307,6 +419,7 @@ window.appInterop = {
         this._linkClickHandler = null;
         this._dotNetRef = null;
         this._dropDotNetRef = null;
+        this._tabDropDotNetRef = null;
         this._lastActiveId = '';
     }
 };

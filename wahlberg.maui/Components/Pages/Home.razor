@@ -61,6 +61,8 @@
             @foreach (var doc in openDocs)
             {
                 <div class="tab @(doc == activeDoc ? "active" : "")"
+                     draggable="true"
+                     data-doc-id="@doc.Id"
                      @onclick="() => TabService.SetActiveDocument(doc)">
                     <span class="tab-title" title="@doc.FilePath">@doc.FileName</span>
                     <button class="tab-close" @onclick="() => CloseTab(doc)" @onclick:stopPropagation="true" title="Close"><i class="bi bi-x"></i></button>
@@ -276,6 +278,11 @@
         {
             await JS.InvokeVoidAsync("appInterop.applyTheme", ThemeService.ActiveTheme);
             await JS.InvokeVoidAsync("appInterop.initDropZone", _dotNetRef);
+            // Only the native Windows (WinUI/WebView2) shell has the broken-native-drag bug —
+            // see the comment on enableWebView2DragPolyfillIfNeeded in app.js.
+            var needsDragPolyfill = OperatingSystem.IsWindows() && !AppMode.IsServiceMode;
+            await JS.InvokeVoidAsync("appInterop.enableWebView2DragPolyfillIfNeeded", needsDragPolyfill);
+            await JS.InvokeVoidAsync("appInterop.initTabDragDrop", _dotNetRef);
         }
 
         var doc = TabService.ActiveDocument;
@@ -475,6 +482,28 @@
         TabService.CloseDocument(doc);
         _lastProcessedDocId = null;
         _lastProcessedReloadVersion = -1;
+    }
+
+    /// <summary>
+    /// Called from app.js's document-level drag handlers once, at drop — tab drag-and-drop
+    /// visuals and hit-testing are handled entirely in JS so a Blazor Server round trip isn't
+    /// needed on every dragover (which fires continuously while the mouse moves and previously
+    /// caused enough re-renders mid-drag to make the browser lose track of the drop target).
+    /// </summary>
+    [JSInvokable]
+    public void OnTabDropped(string draggedId, string? targetId)
+    {
+        if (!Guid.TryParse(draggedId, out var draggedGuid)) return;
+
+        var docs = TabService.GetOpenDocumentsSnapshot();
+        var dragged = docs.FirstOrDefault(d => d.Id == draggedGuid);
+        if (dragged is null) return;
+
+        MarkdownDocument? target = null;
+        if (targetId is not null && Guid.TryParse(targetId, out var targetGuid))
+            target = docs.FirstOrDefault(d => d.Id == targetGuid);
+
+        TabService.ReorderDocument(dragged, target);
     }
 
     private void EditCurrentFile()

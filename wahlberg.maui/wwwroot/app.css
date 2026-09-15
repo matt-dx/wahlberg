@@ -651,6 +651,18 @@ body.drag-over::after {
     opacity: 1;
 }
 
+.tab.dragging {
+    opacity: 0.35;
+}
+
+.workspace.horizontal .tab.drag-over {
+    box-shadow: inset 2px 0 0 var(--theme-accent, #0078d4);
+}
+
+.workspace.vertical .tab.drag-over {
+    box-shadow: inset 0 2px 0 var(--theme-accent, #0078d4);
+}
+
 /* ===== Content Area (TOC + Document) ===== */
 .content-area {
     flex: 1;
