@@ -111,6 +111,13 @@ window.appInterop = {
             document.querySelectorAll('.tab.drag-over').forEach(function (el) { el.classList.remove('drag-over'); });
         };
 
+        // Tracks whether the gesture that's about to start a drag began on the close button.
+        // e.target for a native 'dragstart' is always the draggable ancestor (.tab) regardless
+        // of which descendant the pointer actually went down on, so checking e.target against
+        // .tab-close inside the dragstart handler can never match — mousedown is the only
+        // reliable point to observe where the gesture actually began.
+        let dragStartedOnCloseButton = false;
+
         // The webview2-dnd-polyfill starts a (simulated) drag from any mousedown on a
         // draggable ancestor, which includes the close button nested inside .tab — without
         // this, clicking Close would also be read as a self-drop-to-end reorder right before
@@ -118,7 +125,8 @@ window.appInterop = {
         // mousedown handler on the same document target, so stopping it here keeps the
         // polyfill from ever treating that click as a drag start.
         document.addEventListener('mousedown', function (e) {
-            if (e.target.closest('.tab-close')) e.stopImmediatePropagation();
+            dragStartedOnCloseButton = !!e.target.closest('.tab-close');
+            if (dragStartedOnCloseButton) e.stopImmediatePropagation();
         }, true);
 
         // Blazor's @onkeydown:preventDefault directive is decided once per render, not per
@@ -136,7 +144,7 @@ window.appInterop = {
             // preventDefault cancels that native drag entirely, which is what lets the
             // browser's normal click (and Blazor's CloseTab) fire instead; the mousedown guard
             // above only covers the polyfill's own simulated path, not real native DnD.
-            if (e.target.closest('.tab-close')) {
+            if (dragStartedOnCloseButton) {
                 e.preventDefault();
                 return;
             }
@@ -169,7 +177,10 @@ window.appInterop = {
             if (!self._draggedTabId) return;
             const el = elementAt(e);
             const strip = el && el.closest('.tab-strip');
-            if (!strip) return;
+            // Once the pointer leaves the strip, no tab is a valid drop target anymore — clear
+            // any leftover highlight instead of leaving the last-hovered tab looking like the
+            // drop target for the rest of the drag.
+            if (!strip) { clearDragOver(); return; }
             e.preventDefault();
 
             clearDragOver();
@@ -181,10 +192,21 @@ window.appInterop = {
 
         document.addEventListener('drop', function (e) {
             if (!self._draggedTabId) return;
+            // preventDefault unconditionally as soon as we know this is our own drag, even if
+            // it lands outside the tab strip — otherwise the browser's own default drop
+            // handling can run over ordinary page content (e.g. consuming the dragged
+            // document's id, set as text/plain data, in whatever way it treats dropped text).
+            // Whether to actually reorder is a separate decision, made below via the strip check.
+            e.preventDefault();
+
             const el = elementAt(e);
             const strip = el && el.closest('.tab-strip');
-            if (!strip) return;
-            e.preventDefault();
+            if (!strip) {
+                clearDragOver();
+                document.querySelectorAll('.tab.dragging').forEach(function (el) { el.classList.remove('dragging'); });
+                self._draggedTabId = null;
+                return;
+            }
 
             // A null targetId means "no specific tab" to OnTabDropped/ReorderDocument, which
             // moves the dragged tab to the end — so a self-drop must resolve to its own id
