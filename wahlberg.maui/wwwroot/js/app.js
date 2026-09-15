@@ -29,27 +29,31 @@ window.appInterop = {
 
     initDropZone: function (dotNetRef) {
         this._dropDotNetRef = dotNetRef;
+        const self = this;
 
         // Visual feedback only — MAUI's DropGestureRecognizer handles actual file opening.
-        // The webview2-dnd-polyfill (see enableWebView2DragPolyfillIfNeeded) simulates a tab
-        // drag by dispatching plain Event objects of these same types, which also bubble to
-        // document — instanceof DragEvent excludes those so an in-page tab drag doesn't light
-        // up the "you're dropping a file" overlay.
+        // A tab drag must not light up the "you're dropping a file" overlay: the
+        // webview2-dnd-polyfill (see enableWebView2DragPolyfillIfNeeded) dispatches plain
+        // Event objects that bubble to document, which instanceof DragEvent excludes — but a
+        // genuine native tab drag (real browsers, this app's own --serve mode) dispatches real
+        // DragEvents too, so that check alone doesn't exclude those. Checking
+        // self._draggedTabId (set by initTabDragDrop for the duration of any tab drag,
+        // native or polyfilled) covers both.
         document.addEventListener('dragover', function (e) {
-            if (!(e instanceof DragEvent)) return;
+            if (!(e instanceof DragEvent) || self._draggedTabId) return;
             e.preventDefault();
             document.body.classList.add('drag-over');
         });
 
         document.addEventListener('dragleave', function (e) {
-            if (!(e instanceof DragEvent)) return;
+            if (!(e instanceof DragEvent) || self._draggedTabId) return;
             if (e.relatedTarget === null) {
                 document.body.classList.remove('drag-over');
             }
         });
 
         document.addEventListener('drop', function (e) {
-            if (!(e instanceof DragEvent)) return;
+            if (!(e instanceof DragEvent) || self._draggedTabId) return;
             e.preventDefault();
             document.body.classList.remove('drag-over');
         });
@@ -64,12 +68,28 @@ window.appInterop = {
     // load it only for that shell; real browsers (including this app's own --serve mode) and
     // other platforms' WebViews don't have the bug and should keep using native drag.
     enableWebView2DragPolyfillIfNeeded: function (needed) {
-        if (!needed) return;
-        if (document.querySelector('script[data-webview2-dnd-polyfill]')) return;
-        const script = document.createElement('script');
-        script.src = 'js/webview2-dnd-polyfill.js';
-        script.dataset.webview2DndPolyfill = 'true';
-        document.head.appendChild(script);
+        if (!needed) return Promise.resolve();
+
+        // Blazor's JS interop awaits a returned promise before the caller (OnAfterRenderAsync)
+        // moves on to initTabDragDrop — without that, a drag started before this script tag
+        // finishes loading would still hit the broken native path and silently fail.
+        const existing = document.querySelector('script[data-webview2-dnd-polyfill]');
+        if (existing) {
+            return existing.dataset.loaded === 'true'
+                ? Promise.resolve()
+                : new Promise(function (resolve) { existing.addEventListener('load', resolve, { once: true }); });
+        }
+
+        return new Promise(function (resolve) {
+            const script = document.createElement('script');
+            script.src = 'js/webview2-dnd-polyfill.js';
+            script.dataset.webview2DndPolyfill = 'true';
+            script.onload = function () { script.dataset.loaded = 'true'; resolve(); };
+            // Best-effort — if the script 404s or errors, don't block tab dragging forever;
+            // native drag stays broken on this shell, but at least nothing hangs.
+            script.onerror = resolve;
+            document.head.appendChild(script);
+        });
     },
 
     // Tab reordering runs entirely client-side (drag visuals + hit-testing) and only calls
@@ -90,6 +110,18 @@ window.appInterop = {
         const clearDragOver = function () {
             document.querySelectorAll('.tab.drag-over').forEach(function (el) { el.classList.remove('drag-over'); });
         };
+
+        // The webview2-dnd-polyfill starts a (simulated) drag from any mousedown on a
+        // draggable ancestor, which includes the close button nested inside .tab — without
+        // this, clicking Close would also be read as a self-drop-to-end reorder right before
+        // the tab closes. A capture-phase listener runs before the polyfill's own (bubble-phase)
+        // mousedown handler on the same document target, so stopping it here keeps the
+        // polyfill from ever treating that click as a drag start; the native browser drag path
+        // isn't affected since draggable="true" is only on .tab itself; a native drag started
+        // from inside the close button never fires dragstart on that button in Chromium.
+        document.addEventListener('mousedown', function (e) {
+            if (e.target.closest('.tab-close')) e.stopImmediatePropagation();
+        }, true);
 
         document.addEventListener('dragstart', function (e) {
             const tab = e.target.closest('.tab');
@@ -138,8 +170,12 @@ window.appInterop = {
             if (!strip) return;
             e.preventDefault();
 
+            // A null targetId means "no specific tab" to OnTabDropped/ReorderDocument, which
+            // moves the dragged tab to the end — so a self-drop must resolve to its own id
+            // (a harmless no-op via ReorderDocument's doc == target check), not null, or
+            // picking a tab up and putting it back down would send it to the end instead.
             const tab = el.closest('.tab');
-            const targetId = (tab && tab.dataset.docId !== self._draggedTabId) ? tab.dataset.docId : null;
+            const targetId = tab ? tab.dataset.docId : null;
             const draggedId = self._draggedTabId;
 
             clearDragOver();

@@ -33,7 +33,10 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  * Source: https://gist.github.com/ivanjx/b026ba331796e20a717778ae56760e3c
- * Vendored here unmodified; loaded only for the native Windows (WinUI/WebView2) shell —
+ * Vendored here with one addition (mouseout-based cancellation, at the bottom of the
+ * mouseup handler below) so a drag doesn't stay stuck if the pointer leaves the window
+ * before the button is released — otherwise unmodified. Loaded only for the native
+ * Windows (WinUI/WebView2) shell —
  * see appInterop.enableWebView2DragPolyfillIfNeeded in app.js.
  */
 
@@ -159,23 +162,32 @@ document.addEventListener('mousemove', function (e) {
   }
 });
 
-document.addEventListener('mouseup', function (e) {
-  if (!isDragging || e.button !== 0) return;
+/**
+ * Ends the current simulated drag, resetting all state. Shared by the normal mouseup
+ * completion and the mouseout-based cancellation below (added on top of the original gist)
+ * for when the pointer leaves the window entirely before releasing — that mouseup never
+ * reaches this document, so without this the drag would otherwise stay stuck.
+ * @param {boolean} dispatchDrop - Whether to dispatch a 'drop' on currentOverElement first.
+ */
+function endDrag(dispatchDrop) {
+  if (!isDragging) return;
 
-  if (currentOverElement) {
+  if (dispatchDrop && currentOverElement) {
     currentOverElement.dispatchEvent(createMockDragEvent('drop', {
       bubbles: true,
       cancelable: true
     }));
   }
 
-  draggedElement.dispatchEvent(createMockDragEvent('dragend', {
-    bubbles: true,
-    cancelable: true
-  }));
+  if (draggedElement) {
+    draggedElement.dispatchEvent(createMockDragEvent('dragend', {
+      bubbles: true,
+      cancelable: true
+    }));
+    draggedElement.setAttribute('draggable', 'true');
+  }
 
   isDragging = false;
-  draggedElement.setAttribute('draggable', 'true');
 
   if (ghostElement) {
     document.body.removeChild(ghostElement);
@@ -185,6 +197,21 @@ document.addEventListener('mouseup', function (e) {
   draggedElement = null;
   dragStartEvt = null;
   currentOverElement = null;
+}
+
+document.addEventListener('mouseup', function (e) {
+  if (!isDragging || e.button !== 0) return;
+  endDrag(true);
+});
+
+// relatedTarget === null on a document-level mouseout is the standard signal that the
+// pointer left the browser viewport entirely (the same trick app.js's initDropZone already
+// uses for its own dragleave handling) — cancel rather than drop, since there's no valid
+// target once the pointer is outside the window.
+document.addEventListener('mouseout', function (e) {
+  if (isDragging && e.relatedTarget === null) {
+    endDrag(false);
+  }
 });
 
 /**
