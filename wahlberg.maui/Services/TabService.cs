@@ -43,6 +43,14 @@ public partial class TabService : IDisposable
     // deadlock.
     private readonly object _docsLock = new();
 
+    // Serializes SaveSessionAsync so overlapping calls (e.g. several quick drag-to-reorder
+    // drops) write session.json one at a time instead of racing — an interleaved write could
+    // corrupt the file, and an out-of-order one could leave a stale tab order persisted even
+    // though the UI already moved on. Each call still snapshots _openDocuments fresh when its
+    // turn comes, so a call queued behind a newer one just redundantly re-writes the same
+    // (already current) state rather than losing it.
+    private readonly SemaphoreSlim _saveSessionLock = new(1, 1);
+
     private readonly List<MarkdownDocument> _openDocuments = [];
     public MarkdownDocument? ActiveDocument { get; private set; }
     public TabOrientation Orientation { get; set; } = TabOrientation.Horizontal;
@@ -542,10 +550,13 @@ public partial class TabService : IDisposable
             _pendingReloads.Clear();
             _reloadGenerations.Clear();
         }
+
+        _saveSessionLock.Dispose();
     }
 
     private async Task SaveSessionAsync()
     {
+        await _saveSessionLock.WaitAsync();
         try
         {
             List<string> openRealFiles;
@@ -574,6 +585,10 @@ public partial class TabService : IDisposable
         catch
         {
             // Non-critical — silently ignore
+        }
+        finally
+        {
+            _saveSessionLock.Release();
         }
     }
 

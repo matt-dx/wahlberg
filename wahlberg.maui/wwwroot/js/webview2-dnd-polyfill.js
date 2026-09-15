@@ -33,10 +33,10 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  * Source: https://gist.github.com/ivanjx/b026ba331796e20a717778ae56760e3c
- * Vendored here with one addition (mouseout-based cancellation, at the bottom of the
- * mouseup handler below) so a drag doesn't stay stuck if the pointer leaves the window
- * before the button is released — otherwise unmodified. Loaded only for the native
- * Windows (WinUI/WebView2) shell —
+ * Vendored here with two additions below the mouseup handler, otherwise unmodified:
+ * mouseout-based cancellation, so a drag doesn't stay stuck if the pointer leaves the window
+ * before the button is released, and Escape-to-cancel, matching native HTML5 drag-and-drop's
+ * default behavior. Loaded only for the native Windows (WinUI/WebView2) shell —
  * see appInterop.enableWebView2DragPolyfillIfNeeded in app.js.
  */
 
@@ -210,6 +210,15 @@ document.addEventListener('mouseup', function (e) {
 // target once the pointer is outside the window.
 document.addEventListener('mouseout', function (e) {
   if (isDragging && e.relatedTarget === null) {
+    endDrag(false);
+  }
+});
+
+// Native HTML5 drag-and-drop cancels on Escape by default; this simulated path has no such
+// behavior unless added explicitly, so without this a user pressing Escape mid-drag would see
+// nothing happen and the eventual mouseup would still dispatch a drop.
+document.addEventListener('keydown', function (e) {
+  if (isDragging && e.key === 'Escape') {
     endDrag(false);
   }
 });

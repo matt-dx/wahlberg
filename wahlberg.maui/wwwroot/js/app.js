@@ -116,14 +116,21 @@ window.appInterop = {
         // this, clicking Close would also be read as a self-drop-to-end reorder right before
         // the tab closes. A capture-phase listener runs before the polyfill's own (bubble-phase)
         // mousedown handler on the same document target, so stopping it here keeps the
-        // polyfill from ever treating that click as a drag start; the native browser drag path
-        // isn't affected since draggable="true" is only on .tab itself; a native drag started
-        // from inside the close button never fires dragstart on that button in Chromium.
+        // polyfill from ever treating that click as a drag start.
         document.addEventListener('mousedown', function (e) {
             if (e.target.closest('.tab-close')) e.stopImmediatePropagation();
         }, true);
 
         document.addEventListener('dragstart', function (e) {
+            // draggable="true" on .tab makes its whole subtree a drag source — including the
+            // nested close button — so a native (non-polyfilled) drag can still start there.
+            // preventDefault cancels that native drag entirely, which is what lets the
+            // browser's normal click (and Blazor's CloseTab) fire instead; the mousedown guard
+            // above only covers the polyfill's own simulated path, not real native DnD.
+            if (e.target.closest('.tab-close')) {
+                e.preventDefault();
+                return;
+            }
             const tab = e.target.closest('.tab');
             if (!tab) return;
             self._draggedTabId = tab.dataset.docId;
