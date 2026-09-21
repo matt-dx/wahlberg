@@ -37,11 +37,12 @@ internal static class MermaidRenderer
 
         await using var hidden = await HiddenWebView.CreateAsync();
 
-        // theme: 'dark' matches the live viewer's own mermaid.initialize call (wwwroot/index.html)
-        // so exported diagrams look the same as they do on screen.
+        // theme: 'default' (mermaid's light theme) regardless of the live viewer's own theme —
+        // this renderer only ever feeds exported documents (Pdf/Epub/embedded Markdown), which
+        // are meant to be read on paper or in a plain reader, not on the app's dark canvas.
         var html = "<!DOCTYPE html><html><head><meta charset=\"utf-8\" /><script>"
             + mermaidJs
-            + "</script><script>mermaid.initialize({ startOnLoad: false, theme: 'dark' });</script></head><body></body></html>";
+            + "</script><script>mermaid.initialize({ startOnLoad: false, theme: 'default' });</script></head><body></body></html>";
 
         var tempHtmlPath = Path.Combine(FileSystem.CacheDirectory, $"{Guid.NewGuid()}.html");
         await File.WriteAllTextAsync(tempHtmlPath, html);

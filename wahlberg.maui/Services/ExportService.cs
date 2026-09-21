@@ -31,11 +31,34 @@ public partial class ExportService
         // the original Markdown source and rightly keeps it).
         var (body, _) = FrontMatterParser.Extract(doc.Content, includeHighlighting: false);
 
+        // Markdig renders fenced mermaid blocks as <pre class="mermaid">source</pre> (see
+        // wwwroot/js/app.js), which the live viewer turns into a diagram via mermaid.js at
+        // render time. Pdf/Epub output is static HTML with no script execution, so without this
+        // step those blocks would show up as literal mermaid source text instead of a diagram —
+        // same rendering approach as ExportEmbeddedMarkdownAsync, so Windows-only.
+        var mermaidSvgs = new Queue<string>();
+#if WINDOWS
+        var mermaidSources = Markdig.Parsers.MarkdownParser.Parse(body, _pipeline)
+            .Descendants<FencedCodeBlock>()
+            .Where(b => string.Equals(b.Info, "mermaid", StringComparison.OrdinalIgnoreCase))
+            .Select(b => b.Lines.ToString())
+            .ToList();
+        if (mermaidSources.Count > 0)
+        {
+            foreach (var svg in await Platforms.Windows.MermaidRenderer.RenderAllAsync(mermaidSources))
+                mermaidSvgs.Enqueue(svg);
+        }
+#endif
+
         var (sections, allHeadings) = await Task.Run(() =>
         {
             var secs = SplitContent(body, _pipeline, options.SplitOnHorizontalRule, options.SplitAtHeadingLevel);
             for (var i = 0; i < secs.Count; i++)
-                secs[i] = new ExportSection { Heading = secs[i].Heading, Html = InlineImagesAsDataUris(secs[i].Html, docDir) };
+            {
+                var html = InlineImagesAsDataUris(secs[i].Html, docDir);
+                html = ReplaceMermaidBlocks(html, mermaidSvgs);
+                secs[i] = new ExportSection { Heading = secs[i].Heading, Html = html };
+            }
 
             var headings = options.IncludeToc ? ExtractAllHeadings(body, _pipeline) : [];
             return (secs, headings);
@@ -139,16 +162,8 @@ public partial class ExportService
             {
                 var svg = i < svgs.Count ? svgs[i] : "";
                 if (string.IsNullOrEmpty(svg)) continue;
-                var dataUri = $"data:image/svg+xml;base64,{Convert.ToBase64String(Encoding.UTF8.GetBytes(svg))}";
                 var span = mermaidBlocks[i].Span;
-                // Wrapped in a bordered/padded card (matching the live viewer's .mermaid-rendered
-                // style) so diagrams of wildly different native sizes still look consistent —
-                // a bare ![]() image has nothing to unify their scale. Raw HTML + inline styles
-                // keep this portable to viewers without the app's CSS (GitHub, VS Code, etc.).
-                var framed = "<div style=\"text-align:center;margin:1.5em 0;padding:16px;background:#252526;border:1px solid #888;border-radius:6px;\">\n"
-                    + $"<img src=\"{dataUri}\" alt=\"Mermaid diagram\" style=\"max-width:100%;height:auto;\" />\n"
-                    + "</div>";
-                replacements.Add((span.Start, span.End, framed));
+                replacements.Add((span.Start, span.End, WrapMermaidSvg(svg)));
             }
         }
 #endif
@@ -318,6 +333,36 @@ public partial class ExportService
 
     private static string SelfCloseVoidElements(string html) =>
         VoidElementRegex().Replace(html, m => $"<{m.Groups[1].Value}{m.Groups[2].Value} />");
+
+    [GeneratedRegex(@"<pre class=""mermaid"">.*?</pre>", RegexOptions.Singleline)]
+    private static partial Regex MermaidBlockRegex();
+
+    // Replaces each rendered mermaid <pre> block, in document order, with the corresponding
+    // pre-rendered SVG (dequeued in the same order MermaidRenderer received the sources). A
+    // block whose render failed (empty string) or that has no queued SVG (non-Windows, where
+    // the queue is always empty) is left as-is, so the raw mermaid source stays visible rather
+    // than disappearing silently.
+    private static string ReplaceMermaidBlocks(string html, Queue<string> svgs)
+    {
+        if (svgs.Count == 0) return html;
+
+        return MermaidBlockRegex().Replace(html, m =>
+            svgs.TryDequeue(out var svg) && !string.IsNullOrEmpty(svg) ? WrapMermaidSvg(svg) : m.Value);
+    }
+
+    // Wraps a rendered mermaid SVG in a bordered/padded card (matching the export CSS's light,
+    // paper-oriented palette — see DefaultExportCss's `pre`/table border colors) so diagrams of
+    // wildly different native sizes still look consistent, the way a bare <img> would not. Raw
+    // HTML + inline styles keep this portable to readers without the app's CSS (GitHub, EPUB
+    // readers, etc.). Shared by both the Pdf/Epub path (ReplaceMermaidBlocks) and the embedded
+    // Markdown export.
+    private static string WrapMermaidSvg(string svg)
+    {
+        var dataUri = $"data:image/svg+xml;base64,{Convert.ToBase64String(Encoding.UTF8.GetBytes(svg))}";
+        return "<div style=\"text-align:center;margin:1.5em 0;padding:16px;background:#f4f4f4;border:1px solid #ccc;border-radius:6px;\">\n"
+            + $"<img src=\"{dataUri}\" alt=\"Mermaid diagram\" style=\"max-width:100%;height:auto;\" />\n"
+            + "</div>";
+    }
 
     private const string DefaultExportCss = """
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; color: #1a1a1a; margin: 0; }
