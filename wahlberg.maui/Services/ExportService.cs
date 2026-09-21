@@ -372,7 +372,11 @@ public partial class ExportService
         .export-cover { display: flex; align-items: center; justify-content: center; height: 100%; }
         .export-cover img { max-width: 100%; max-height: 100%; }
         img { max-width: 100%; }
+        h1, h2, h3, h4, h5, h6 { break-after: avoid-page; page-break-after: avoid; }
+        p { orphans: 3; }
         table { border-collapse: collapse; width: 100%; }
+        thead { display: table-header-group; }
+        tr { break-inside: avoid; page-break-inside: avoid; }
         th, td { border: 1px solid #ccc; padding: 6px 10px; }
         pre { background: #f4f4f4; padding: 10px; overflow-x: auto; }
         code { font-family: "Cascadia Code", "Fira Code", Consolas, monospace; }
