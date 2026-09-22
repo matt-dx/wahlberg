@@ -37,6 +37,14 @@ public partial class ExportService
         // step those blocks would show up as literal mermaid source text instead of a diagram —
         // same rendering approach as ExportEmbeddedMarkdownAsync, so Windows-only.
         var mermaidSvgs = new List<string>();
+
+        // A fresh, per-export random value embedded in TagMermaidBlocks's internal marker.
+        // Without it, a document containing raw HTML that happens to spell out our marker
+        // exactly (e.g. <pre class="mermaid" data-mermaid-idx="0">) — never tagged, since it
+        // isn't a FencedCodeBlock — could still match ReplaceMermaidBlocks's regex and steal
+        // another block's SVG. That HTML is necessarily written before this export ever runs, so
+        // it cannot contain a value only generated here; only genuinely tagged blocks match.
+        var mermaidSentinel = Guid.NewGuid().ToString("N");
 #if WINDOWS
         var mermaidSources = Markdig.Parsers.MarkdownParser.Parse(body, _pipeline)
             .Descendants<FencedCodeBlock>()
@@ -61,11 +69,11 @@ public partial class ExportService
 
         var (sections, allHeadings) = await Task.Run(() =>
         {
-            var secs = SplitContent(body, _pipeline, options.SplitOnHorizontalRule, options.SplitAtHeadingLevel);
+            var secs = SplitContent(body, _pipeline, options.SplitOnHorizontalRule, options.SplitAtHeadingLevel, mermaidSentinel);
             for (var i = 0; i < secs.Count; i++)
             {
                 var html = InlineImagesAsDataUris(secs[i].Html, docDir);
-                html = ReplaceMermaidBlocks(html, mermaidSvgs);
+                html = ReplaceMermaidBlocks(html, mermaidSvgs, mermaidSentinel);
                 secs[i] = new ExportSection { Heading = secs[i].Heading, Html = html };
             }
 
@@ -82,10 +90,10 @@ public partial class ExportService
     // Splits the document's Markdig AST into sections at thematic-break and/or heading-level
     // boundaries. Splitting on the AST (rather than the rendered HTML string) gives precise
     // structural boundaries regardless of what markup happens to appear inside code blocks/tables.
-    public List<ExportSection> SplitContent(string markdown, MarkdownPipeline pipeline, bool splitOnHr, int? splitHeadingLevel)
+    public List<ExportSection> SplitContent(string markdown, MarkdownPipeline pipeline, bool splitOnHr, int? splitHeadingLevel, string mermaidSentinel)
     {
         var document = Markdig.Parsers.MarkdownParser.Parse(markdown, pipeline);
-        TagMermaidBlocks(document);
+        TagMermaidBlocks(document, mermaidSentinel);
         var sections = new List<ExportSection>();
         var current = new List<Block>();
         HeadingInfo? currentHeading = null;
@@ -348,11 +356,14 @@ public partial class ExportService
     // traversal (and using the same "Info == mermaid" filter) as the source extraction in
     // ExportAsync, so the Nth mermaid block found here is always the Nth source that was sent to
     // MermaidRenderer. The index rides along as a data attribute on the rendered
-    // <pre class="mermaid" data-mermaid-idx="N"> tag; ReplaceMermaidBlocks keys off it instead of
-    // blindly matching any "<pre class=\"mermaid\">" text, so raw HTML in the document that
-    // merely looks like a mermaid block (never tagged, since it isn't a FencedCodeBlock) can't
-    // consume another block's SVG and shift every replacement after it out of alignment.
-    private static void TagMermaidBlocks(Markdig.Syntax.MarkdownDocument document)
+    // <pre class="mermaid" data-mermaid-idx="{sentinel}:N"> tag; ReplaceMermaidBlocks keys off it
+    // instead of blindly matching any "<pre class=\"mermaid\">" text. The sentinel (a random value
+    // generated fresh per export, see ExportAsync) is what makes that safe against raw HTML in the
+    // document that merely looks like a tagged mermaid block: such HTML is necessarily written
+    // before this export ever runs, so it cannot contain this run's sentinel and can never match —
+    // an index alone wouldn't be enough, since a document could just as easily spell out
+    // data-mermaid-idx="0" itself.
+    private static void TagMermaidBlocks(Markdig.Syntax.MarkdownDocument document, string sentinel)
     {
         var idx = 0;
         foreach (var block in document.Descendants<FencedCodeBlock>())
@@ -361,11 +372,11 @@ public partial class ExportService
 
             // UseAdvancedExtensions' generic-attributes extension lets a document attach its own
             // attributes to a fenced block (e.g. "```mermaid {data-mermaid-idx=99}"), which would
-            // otherwise survive AddPropertyIfNotExist below and hand an attacker-controlled index
+            // otherwise survive AddPropertyIfNotExist below and hand a document-controlled value
             // to ReplaceMermaidBlocks's SVG lookup — this index must always be ours, not theirs.
             var attributes = block.GetAttributes();
             attributes.Properties?.RemoveAll(p => p.Key == "data-mermaid-idx");
-            attributes.AddPropertyIfNotExist("data-mermaid-idx", (idx++).ToString());
+            attributes.AddPropertyIfNotExist("data-mermaid-idx", $"{sentinel}:{idx++}");
         }
     }
 
@@ -374,9 +385,11 @@ public partial class ExportService
     // generic attributes on a fenced block can add an id before Markdig's own class attribute
     // (e.g. "```mermaid {#chart}" renders as <pre id="chart" class="mermaid" ...>), and can add
     // extra classes into the same attribute (e.g. "```mermaid {.extra}" renders as
-    // class="extra mermaid").
-    [GeneratedRegex(@"<pre\b(?=[^>]*\bclass=""(?:[^""]*\s)?mermaid(?:\s[^""]*)?"")(?=[^>]*\bdata-mermaid-idx=""(\d+)"")[^>]*>(.*?)</pre>", RegexOptions.Singleline)]
-    private static partial Regex MermaidBlockRegex();
+    // class="extra mermaid"). Built at runtime (rather than [GeneratedRegex], which needs a
+    // compile-time-constant pattern) since the sentinel is only known per export call.
+    private static Regex MermaidBlockRegex(string sentinel) => new(
+        $@"<pre\b(?=[^>]*\bclass=""(?:[^""]*\s)?mermaid(?:\s[^""]*)?"")(?=[^>]*\bdata-mermaid-idx=""{Regex.Escape(sentinel)}:(\d+)"")[^>]*>(.*?)</pre>",
+        RegexOptions.Singleline);
 
     // Replaces each tagged mermaid <pre> block with its pre-rendered SVG, looked up by the
     // data-mermaid-idx TagMermaidBlocks assigned it (not by match order — see that method for
@@ -385,9 +398,9 @@ public partial class ExportService
     // strips the data-mermaid-idx marker — internal replacement bookkeeping that has no
     // business leaking into the exported document — rather than only doing so when a swap
     // actually happens.
-    private static string ReplaceMermaidBlocks(string html, List<string> svgs)
+    private static string ReplaceMermaidBlocks(string html, List<string> svgs, string sentinel)
     {
-        return MermaidBlockRegex().Replace(html, m =>
+        return MermaidBlockRegex(sentinel).Replace(html, m =>
         {
             if (int.TryParse(m.Groups[1].Value, out var idx) && idx >= 0 && idx < svgs.Count)
             {
