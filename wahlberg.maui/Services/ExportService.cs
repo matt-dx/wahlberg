@@ -369,7 +369,13 @@ public partial class ExportService
         }
     }
 
-    [GeneratedRegex(@"<pre class=""mermaid"" data-mermaid-idx=""(\d+)"">(.*?)</pre>", RegexOptions.Singleline)]
+    // Lookaheads (rather than a fixed "class=\"mermaid\" data-mermaid-idx=\"...\"" sequence) so a
+    // match doesn't depend on attribute order or on "mermaid" being the class value's only word:
+    // generic attributes on a fenced block can add an id before Markdig's own class attribute
+    // (e.g. "```mermaid {#chart}" renders as <pre id="chart" class="mermaid" ...>), and can add
+    // extra classes into the same attribute (e.g. "```mermaid {.extra}" renders as
+    // class="extra mermaid").
+    [GeneratedRegex(@"<pre\b(?=[^>]*\bclass=""(?:[^""]*\s)?mermaid(?:\s[^""]*)?"")(?=[^>]*\bdata-mermaid-idx=""(\d+)"")[^>]*>(.*?)</pre>", RegexOptions.Singleline)]
     private static partial Regex MermaidBlockRegex();
 
     // Replaces each tagged mermaid <pre> block with its pre-rendered SVG, looked up by the
