@@ -358,7 +358,14 @@ public partial class ExportService
         foreach (var block in document.Descendants<FencedCodeBlock>())
         {
             if (!string.Equals(block.Info, "mermaid", StringComparison.OrdinalIgnoreCase)) continue;
-            block.GetAttributes().AddPropertyIfNotExist("data-mermaid-idx", (idx++).ToString());
+
+            // UseAdvancedExtensions' generic-attributes extension lets a document attach its own
+            // attributes to a fenced block (e.g. "```mermaid {data-mermaid-idx=99}"), which would
+            // otherwise survive AddPropertyIfNotExist below and hand an attacker-controlled index
+            // to ReplaceMermaidBlocks's SVG lookup — this index must always be ours, not theirs.
+            var attributes = block.GetAttributes();
+            attributes.Properties?.RemoveAll(p => p.Key == "data-mermaid-idx");
+            attributes.AddPropertyIfNotExist("data-mermaid-idx", (idx++).ToString());
         }
     }
 
