@@ -362,22 +362,27 @@ public partial class ExportService
         }
     }
 
-    [GeneratedRegex(@"<pre class=""mermaid"" data-mermaid-idx=""(\d+)"">.*?</pre>", RegexOptions.Singleline)]
+    [GeneratedRegex(@"<pre class=""mermaid"" data-mermaid-idx=""(\d+)"">(.*?)</pre>", RegexOptions.Singleline)]
     private static partial Regex MermaidBlockRegex();
 
     // Replaces each tagged mermaid <pre> block with its pre-rendered SVG, looked up by the
     // data-mermaid-idx TagMermaidBlocks assigned it (not by match order — see that method for
-    // why). A missing/out-of-range index or an empty SVG (failed render) leaves the original
-    // text in place rather than disappearing silently.
+    // why). A missing/out-of-range index or an empty SVG (failed render, or no rendering
+    // attempted at all on non-Windows) keeps the original mermaid source visible, but always
+    // strips the data-mermaid-idx marker — internal replacement bookkeeping that has no
+    // business leaking into the exported document — rather than only doing so when a swap
+    // actually happens.
     private static string ReplaceMermaidBlocks(string html, List<string> svgs)
     {
-        if (svgs.Count == 0) return html;
-
         return MermaidBlockRegex().Replace(html, m =>
         {
-            if (!int.TryParse(m.Groups[1].Value, out var idx) || idx < 0 || idx >= svgs.Count) return m.Value;
-            var svg = svgs[idx];
-            return string.IsNullOrEmpty(svg) ? m.Value : WrapMermaidSvg(svg);
+            if (int.TryParse(m.Groups[1].Value, out var idx) && idx >= 0 && idx < svgs.Count)
+            {
+                var svg = svgs[idx];
+                if (!string.IsNullOrEmpty(svg)) return WrapMermaidSvg(svg);
+            }
+
+            return $"<pre class=\"mermaid\">{m.Groups[2].Value}</pre>";
         });
     }
 
