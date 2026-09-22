@@ -471,7 +471,7 @@ window.appInterop = {
             pre.style.display = 'none';
             pre.insertAdjacentElement('afterend', div);
 
-            await this._renderMermaidInto(div, pre.textContent);
+            await this._renderMermaidInto(div, pre.textContent, pre);
         }
     },
 
@@ -481,7 +481,7 @@ window.appInterop = {
     // labels can overlap the bar they sit under (mermaid-js/mermaid#5926); every other
     // diagram type is unaffected since _xAxisLabelsOverlap only matches xyChart's own
     // bottom-axis label group, so this is a no-op for them.
-    _renderMermaidInto: async function (div, source) {
+    _renderMermaidInto: async function (div, source, pre) {
         try {
             const rendered = await mermaid.render(div.id + '-svg', source);
             div.innerHTML = rendered.svg;
@@ -498,6 +498,13 @@ window.appInterop = {
             }
         } catch (e) {
             console.error('Mermaid rendering error:', e);
+            // mermaid.render can reject outright (invalid/unsupported diagram) without ever
+            // setting div.innerHTML, and _renderMermaid already hid the source `pre` right
+            // before calling this — leaving both empty would make the diagram disappear
+            // entirely. Drop the empty container and restore the original source instead, so
+            // the raw mermaid text stays visible as a fallback.
+            div.remove();
+            if (pre) pre.style.display = '';
         }
     },
 
