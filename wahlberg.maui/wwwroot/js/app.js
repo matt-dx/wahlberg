@@ -459,28 +459,76 @@ window.appInterop = {
         const blocks = document.querySelectorAll('pre.mermaid:not([data-mermaid-processed])');
         if (blocks.length === 0) return;
 
-        const divsToRender = [];
-        blocks.forEach(function (pre, index) {
+        for (let index = 0; index < blocks.length; index++) {
+            const pre = blocks[index];
             pre.setAttribute('data-mermaid-processed', 'true');
 
             const div = document.createElement('div');
             div.className = 'mermaid-rendered';
             div.id = 'mermaid-' + Date.now() + '-' + index;
-            div.textContent = pre.textContent;
 
             // Hide the <pre> but keep it in DOM so Blazor can still manage it
             pre.style.display = 'none';
             pre.insertAdjacentElement('afterend', div);
-            divsToRender.push(div);
-        });
 
-        if (divsToRender.length > 0) {
-            try {
-                await mermaid.run({ nodes: divsToRender });
-            } catch (e) {
-                console.error('Mermaid rendering error:', e);
-            }
+            await this._renderMermaidInto(div, pre.textContent, pre);
         }
+    },
+
+    // Renders one diagram, then checks for overlapping x-axis category labels and
+    // re-renders once with them rotated if needed. xyChart-beta (mermaid's bar/line chart)
+    // lays out labels with no collision detection of its own, so long or numerous category
+    // labels can overlap the bar they sit under (mermaid-js/mermaid#5926); every other
+    // diagram type is unaffected since _xAxisLabelsOverlap only matches xyChart's own
+    // bottom-axis label group, so this is a no-op for them.
+    _renderMermaidInto: async function (div, source, pre) {
+        try {
+            const rendered = await mermaid.render(div.id + '-svg', source);
+            div.innerHTML = rendered.svg;
+            if (rendered.bindFunctions) rendered.bindFunctions(div);
+
+            if (this._xAxisLabelsOverlap(div)) {
+                // %%{init: ...}%% overrides config for just this render call, so it can't
+                // leak into diagrams rendered before or after it (unlike calling
+                // mermaid.initialize() again, which would change the global config).
+                const rotated = '%%{init: {"xyChart": {"xAxis": {"labelRotation": 90}}}}%%\n' + source;
+                const rotatedRendered = await mermaid.render(div.id + '-svg-rotated', rotated);
+                div.innerHTML = rotatedRendered.svg;
+                if (rotatedRendered.bindFunctions) rotatedRendered.bindFunctions(div);
+            }
+        } catch (e) {
+            console.error('Mermaid rendering error:', e);
+            // mermaid.render can reject outright (invalid/unsupported diagram) without ever
+            // setting div.innerHTML, and _renderMermaid already hid the source `pre` right
+            // before calling this — leaving both empty would make the diagram disappear
+            // entirely. Drop the empty container and restore the original source instead, so
+            // the raw mermaid text stays visible as a fallback.
+            div.remove();
+            if (pre) pre.style.display = '';
+        }
+    },
+
+    // True when consecutive x-axis category labels' bounding boxes overlap horizontally.
+    // Only xyChart-beta emits a 'bottom-axis' axis group with a nested 'label' group, so
+    // this is always false for other diagram types (flowcharts, sequence diagrams, etc.).
+    // Deliberately uses getBoundingClientRect() (post-transform, viewport space) rather than
+    // getBBox() (pre-transform, local space) — each label's actual x/y come from a
+    // `transform="translate(...)"` on the <text> itself with x="0" y="0" attributes, so
+    // getBBox() would return nearly the same small box centered on the local origin for
+    // every label regardless of where it actually renders, making every multi-label chart
+    // look "overlapping".
+    _xAxisLabelsOverlap: function (container) {
+        const labels = container.querySelectorAll('g.bottom-axis g.label text');
+        if (labels.length < 2) return false;
+
+        const boxes = Array.from(labels)
+            .map(function (el) { return el.getBoundingClientRect(); })
+            .sort(function (a, b) { return a.left - b.left; });
+
+        for (let i = 1; i < boxes.length; i++) {
+            if (boxes[i].left < boxes[i - 1].right) return true;
+        }
+        return false;
     },
 
     dispose: function () {

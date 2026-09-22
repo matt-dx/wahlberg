@@ -14,15 +14,20 @@ internal sealed class HiddenWebView : IAsyncDisposable
 {
     private static readonly TimeSpan SetupTimeout = TimeSpan.FromSeconds(20);
 
+    public const int DefaultWidth = 1024;
+    public const int DefaultHeight = 768;
+
     public WebView2 View { get; }
     public CoreWebView2Environment Environment { get; }
 
     private readonly Microsoft.UI.Xaml.Window _window;
+    private readonly AppWindow _appWindow;
     private readonly string _userDataFolder;
 
-    private HiddenWebView(Microsoft.UI.Xaml.Window window, WebView2 view, CoreWebView2Environment environment, string userDataFolder)
+    private HiddenWebView(Microsoft.UI.Xaml.Window window, AppWindow appWindow, WebView2 view, CoreWebView2Environment environment, string userDataFolder)
     {
         _window = window;
+        _appWindow = appWindow;
         View = view;
         Environment = environment;
         _userDataFolder = userDataFolder;
@@ -37,7 +42,7 @@ internal sealed class HiddenWebView : IAsyncDisposable
         var hwnd = WindowNative.GetWindowHandle(window);
         var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
         var appWindow = AppWindow.GetFromWindowId(windowId);
-        appWindow.Resize(new global::Windows.Graphics.SizeInt32(1024, 768));
+        appWindow.Resize(new global::Windows.Graphics.SizeInt32(DefaultWidth, DefaultHeight));
         appWindow.Hide();
 
         // Each hidden instance gets its own profile folder — reusing one across
@@ -49,8 +54,14 @@ internal sealed class HiddenWebView : IAsyncDisposable
             "Creating the WebView2 environment");
         await WithTimeout(webview.EnsureCoreWebView2Async(env).AsTask(), "Initializing WebView2");
 
-        return new HiddenWebView(window, webview, env, userDataFolder);
+        return new HiddenWebView(window, appWindow, webview, env, userDataFolder);
     }
+
+    // Resizes the hidden window/WebView2 before navigation, so the DOM lays out at a caller-chosen
+    // width instead of this class's generic on-screen default (e.g. PdfExporter uses this to match
+    // the printed page's content width before measuring rendered element sizes).
+    public void Resize(int width, int height) =>
+        _appWindow.Resize(new global::Windows.Graphics.SizeInt32(width, height));
 
     public async Task NavigateAndWaitAsync(string url)
     {

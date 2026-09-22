@@ -37,11 +37,12 @@ internal static class MermaidRenderer
 
         await using var hidden = await HiddenWebView.CreateAsync();
 
-        // theme: 'dark' matches the live viewer's own mermaid.initialize call (wwwroot/index.html)
-        // so exported diagrams look the same as they do on screen.
+        // theme: 'default' (mermaid's light theme) regardless of the live viewer's own theme —
+        // this renderer only ever feeds exported documents (Pdf/Epub/embedded Markdown), which
+        // are meant to be read on paper or in a plain reader, not on the app's dark canvas.
         var html = "<!DOCTYPE html><html><head><meta charset=\"utf-8\" /><script>"
             + mermaidJs
-            + "</script><script>mermaid.initialize({ startOnLoad: false, theme: 'dark' });</script></head><body></body></html>";
+            + "</script><script>mermaid.initialize({ startOnLoad: false, theme: 'default' });</script></head><body></body></html>";
 
         var tempHtmlPath = Path.Combine(FileSystem.CacheDirectory, $"{Guid.NewGuid()}.html");
         await File.WriteAllTextAsync(tempHtmlPath, html);
@@ -52,11 +53,50 @@ internal static class MermaidRenderer
             var sourcesJson = JsonSerializer.Serialize(sources);
             var script = $$"""
                 (async () => {
+                    // Same overlap check as the live viewer's _xAxisLabelsOverlap (wwwroot/js/app.js)
+                    // — xyChart-beta (mermaid's bar/line chart) doesn't detect collisions between its
+                    // own x-axis category labels, so long/numerous labels can overlap the bar they sit
+                    // under (mermaid-js/mermaid#5926). getBoundingClientRect() needs layout, which a
+                    // detached DOMParser document never gets, so the candidate SVG is attached to a
+                    // hidden probe element in this (already off-screen) page just long enough to
+                    // measure it — visibility:hidden (not display:none) so it still lays out.
+                    // getBoundingClientRect() (post-transform, viewport space) is used rather than
+                    // getBBox() (pre-transform, local space) because each label's actual x/y come from
+                    // a transform="translate(...)" on the <text> itself with x="0" y="0" attributes, so
+                    // getBBox() would return nearly the same small box centered on the local origin for
+                    // every label regardless of where it actually renders.
+                    const xAxisLabelsOverlap = (svgMarkup) => {
+                        const probe = document.createElement('div');
+                        probe.style.position = 'absolute';
+                        probe.style.visibility = 'hidden';
+                        probe.innerHTML = svgMarkup;
+                        document.body.appendChild(probe);
+                        try {
+                            const labels = probe.querySelectorAll('g.bottom-axis g.label text');
+                            if (labels.length < 2) return false;
+                            const boxes = Array.from(labels)
+                                .map((el) => el.getBoundingClientRect())
+                                .sort((a, b) => a.left - b.left);
+                            for (let i = 1; i < boxes.length; i++) {
+                                if (boxes[i].left < boxes[i - 1].right) return true;
+                            }
+                            return false;
+                        } finally {
+                            probe.remove();
+                        }
+                    };
+
                     const sources = {{sourcesJson}};
                     const results = [];
                     for (let i = 0; i < sources.length; i++) {
                         try {
-                            const { svg } = await mermaid.render('mmd-' + i, sources[i]);
+                            let { svg } = await mermaid.render('mmd-' + i, sources[i]);
+                            if (xAxisLabelsOverlap(svg)) {
+                                // %%{init: ...}%% overrides config for just this render call, so it
+                                // can't leak into other sources rendered before or after it.
+                                const rotatedSource = '%%{init: {"xyChart": {"xAxis": {"labelRotation": 90} } } }%%\n' + sources[i];
+                                ({ svg } = await mermaid.render('mmd-' + i + '-rotated', rotatedSource));
+                            }
                             // Mermaid's own SVG root uses width="100%" plus an internal
                             // max-width style, which only resolves sensibly when it renders
                             // straight into the live page's DOM. Used standalone as an <img>

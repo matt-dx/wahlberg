@@ -31,11 +31,51 @@ public partial class ExportService
         // the original Markdown source and rightly keeps it).
         var (body, _) = FrontMatterParser.Extract(doc.Content, includeHighlighting: false);
 
+        // Markdig renders fenced mermaid blocks as <pre class="mermaid">source</pre> (see
+        // wwwroot/js/app.js), which the live viewer turns into a diagram via mermaid.js at
+        // render time. Pdf/Epub output is static HTML with no script execution, so without this
+        // step those blocks would show up as literal mermaid source text instead of a diagram —
+        // same rendering approach as ExportEmbeddedMarkdownAsync, so Windows-only.
+        var mermaidSvgs = new List<string>();
+
+        // A fresh, per-export random value embedded in TagMermaidBlocks's internal marker.
+        // Without it, a document containing raw HTML that happens to spell out our marker
+        // exactly (e.g. <pre class="mermaid" data-mermaid-idx="0">) — never tagged, since it
+        // isn't a FencedCodeBlock — could still match ReplaceMermaidBlocks's regex and steal
+        // another block's SVG. That HTML is necessarily written before this export ever runs, so
+        // it cannot contain a value only generated here; only genuinely tagged blocks match.
+        var mermaidSentinel = Guid.NewGuid().ToString("N");
+#if WINDOWS
+        var mermaidSources = Markdig.Parsers.MarkdownParser.Parse(body, _pipeline)
+            .Descendants<FencedCodeBlock>()
+            .Where(b => string.Equals(b.Info, "mermaid", StringComparison.OrdinalIgnoreCase))
+            .Select(b => b.Lines.ToString())
+            .ToList();
+        if (mermaidSources.Count > 0)
+        {
+            try
+            {
+                mermaidSvgs = await Platforms.Windows.MermaidRenderer.RenderAllAsync(mermaidSources);
+            }
+            catch
+            {
+                // A renderer-wide failure (hidden WebView2 setup/navigation/script errors)
+                // shouldn't abort the whole Pdf/Epub export — leave mermaidSvgs empty so
+                // ReplaceMermaidBlocks falls back to the raw mermaid source for every block.
+                mermaidSvgs = [];
+            }
+        }
+#endif
+
         var (sections, allHeadings) = await Task.Run(() =>
         {
-            var secs = SplitContent(body, _pipeline, options.SplitOnHorizontalRule, options.SplitAtHeadingLevel);
+            var secs = SplitContent(body, _pipeline, options.SplitOnHorizontalRule, options.SplitAtHeadingLevel, mermaidSentinel);
             for (var i = 0; i < secs.Count; i++)
-                secs[i] = new ExportSection { Heading = secs[i].Heading, Html = InlineImagesAsDataUris(secs[i].Html, docDir) };
+            {
+                var html = InlineImagesAsDataUris(secs[i].Html, docDir);
+                html = ReplaceMermaidBlocks(html, mermaidSvgs, mermaidSentinel);
+                secs[i] = new ExportSection { Heading = secs[i].Heading, Html = html };
+            }
 
             var headings = options.IncludeToc ? ExtractAllHeadings(body, _pipeline) : [];
             return (secs, headings);
@@ -50,9 +90,10 @@ public partial class ExportService
     // Splits the document's Markdig AST into sections at thematic-break and/or heading-level
     // boundaries. Splitting on the AST (rather than the rendered HTML string) gives precise
     // structural boundaries regardless of what markup happens to appear inside code blocks/tables.
-    public List<ExportSection> SplitContent(string markdown, MarkdownPipeline pipeline, bool splitOnHr, int? splitHeadingLevel)
+    public List<ExportSection> SplitContent(string markdown, MarkdownPipeline pipeline, bool splitOnHr, int? splitHeadingLevel, string mermaidSentinel)
     {
         var document = Markdig.Parsers.MarkdownParser.Parse(markdown, pipeline);
+        TagMermaidBlocks(document, mermaidSentinel);
         var sections = new List<ExportSection>();
         var current = new List<Block>();
         HeadingInfo? currentHeading = null;
@@ -139,16 +180,8 @@ public partial class ExportService
             {
                 var svg = i < svgs.Count ? svgs[i] : "";
                 if (string.IsNullOrEmpty(svg)) continue;
-                var dataUri = $"data:image/svg+xml;base64,{Convert.ToBase64String(Encoding.UTF8.GetBytes(svg))}";
                 var span = mermaidBlocks[i].Span;
-                // Wrapped in a bordered/padded card (matching the live viewer's .mermaid-rendered
-                // style) so diagrams of wildly different native sizes still look consistent —
-                // a bare ![]() image has nothing to unify their scale. Raw HTML + inline styles
-                // keep this portable to viewers without the app's CSS (GitHub, VS Code, etc.).
-                var framed = "<div style=\"text-align:center;margin:1.5em 0;padding:16px;background:#252526;border:1px solid #888;border-radius:6px;\">\n"
-                    + $"<img src=\"{dataUri}\" alt=\"Mermaid diagram\" style=\"max-width:100%;height:auto;\" />\n"
-                    + "</div>";
-                replacements.Add((span.Start, span.End, framed));
+                replacements.Add((span.Start, span.End, WrapMermaidSvg(svg)));
             }
         }
 #endif
@@ -319,6 +352,80 @@ public partial class ExportService
     private static string SelfCloseVoidElements(string html) =>
         VoidElementRegex().Replace(html, m => $"<{m.Groups[1].Value}{m.Groups[2].Value} />");
 
+    // Tags each fenced mermaid block with a stable sequential index, in the same document-order
+    // traversal (and using the same "Info == mermaid" filter) as the source extraction in
+    // ExportAsync, so the Nth mermaid block found here is always the Nth source that was sent to
+    // MermaidRenderer. The index rides along as a data attribute on the rendered
+    // <pre class="mermaid" data-mermaid-idx="{sentinel}:N"> tag; ReplaceMermaidBlocks keys off it
+    // instead of blindly matching any "<pre class=\"mermaid\">" text. The sentinel (a random value
+    // generated fresh per export, see ExportAsync) is what makes that safe against raw HTML in the
+    // document that merely looks like a tagged mermaid block: such HTML is necessarily written
+    // before this export ever runs, so it cannot contain this run's sentinel and can never match —
+    // an index alone wouldn't be enough, since a document could just as easily spell out
+    // data-mermaid-idx="0" itself.
+    private static void TagMermaidBlocks(Markdig.Syntax.MarkdownDocument document, string sentinel)
+    {
+        var idx = 0;
+        foreach (var block in document.Descendants<FencedCodeBlock>())
+        {
+            if (!string.Equals(block.Info, "mermaid", StringComparison.OrdinalIgnoreCase)) continue;
+
+            // UseAdvancedExtensions' generic-attributes extension lets a document attach its own
+            // attributes to a fenced block (e.g. "```mermaid {data-mermaid-idx=99}"), which would
+            // otherwise survive AddPropertyIfNotExist below and hand a document-controlled value
+            // to ReplaceMermaidBlocks's SVG lookup — this index must always be ours, not theirs.
+            var attributes = block.GetAttributes();
+            attributes.Properties?.RemoveAll(p => p.Key == "data-mermaid-idx");
+            attributes.AddPropertyIfNotExist("data-mermaid-idx", $"{sentinel}:{idx++}");
+        }
+    }
+
+    // Lookaheads (rather than a fixed "class=\"mermaid\" data-mermaid-idx=\"...\"" sequence) so a
+    // match doesn't depend on attribute order or on "mermaid" being the class value's only word:
+    // generic attributes on a fenced block can add an id before Markdig's own class attribute
+    // (e.g. "```mermaid {#chart}" renders as <pre id="chart" class="mermaid" ...>), and can add
+    // extra classes into the same attribute (e.g. "```mermaid {.extra}" renders as
+    // class="extra mermaid"). Built at runtime (rather than [GeneratedRegex], which needs a
+    // compile-time-constant pattern) since the sentinel is only known per export call.
+    private static Regex MermaidBlockRegex(string sentinel) => new(
+        $@"<pre\b(?=[^>]*\bclass=""(?:[^""]*\s)?mermaid(?:\s[^""]*)?"")(?=[^>]*\bdata-mermaid-idx=""{Regex.Escape(sentinel)}:(\d+)"")[^>]*>(.*?)</pre>",
+        RegexOptions.Singleline);
+
+    // Replaces each tagged mermaid <pre> block with its pre-rendered SVG, looked up by the
+    // data-mermaid-idx TagMermaidBlocks assigned it (not by match order — see that method for
+    // why). A missing/out-of-range index or an empty SVG (failed render, or no rendering
+    // attempted at all on non-Windows) keeps the original mermaid source visible, but always
+    // strips the data-mermaid-idx marker — internal replacement bookkeeping that has no
+    // business leaking into the exported document — rather than only doing so when a swap
+    // actually happens.
+    private static string ReplaceMermaidBlocks(string html, List<string> svgs, string sentinel)
+    {
+        return MermaidBlockRegex(sentinel).Replace(html, m =>
+        {
+            if (int.TryParse(m.Groups[1].Value, out var idx) && idx >= 0 && idx < svgs.Count)
+            {
+                var svg = svgs[idx];
+                if (!string.IsNullOrEmpty(svg)) return WrapMermaidSvg(svg);
+            }
+
+            return $"<pre class=\"mermaid\">{m.Groups[2].Value}</pre>";
+        });
+    }
+
+    // Wraps a rendered mermaid SVG in a bordered/padded card (matching the export CSS's light,
+    // paper-oriented palette — see DefaultExportCss's `pre`/table border colors) so diagrams of
+    // wildly different native sizes still look consistent, the way a bare <img> would not. Raw
+    // HTML + inline styles keep this portable to readers without the app's CSS (GitHub, EPUB
+    // readers, etc.). Shared by both the Pdf/Epub path (ReplaceMermaidBlocks) and the embedded
+    // Markdown export.
+    private static string WrapMermaidSvg(string svg)
+    {
+        var dataUri = $"data:image/svg+xml;base64,{Convert.ToBase64String(Encoding.UTF8.GetBytes(svg))}";
+        return "<div style=\"text-align:center;margin:1.5em 0;padding:16px;background:#f4f4f4;border:1px solid #ccc;border-radius:6px;\">\n"
+            + $"<img src=\"{dataUri}\" alt=\"Mermaid diagram\" style=\"max-width:100%;height:auto;\" />\n"
+            + "</div>";
+    }
+
     private const string DefaultExportCss = """
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; color: #1a1a1a; margin: 0; }
         .export-page { padding: 1in 0.9in; }
@@ -327,7 +434,11 @@ public partial class ExportService
         .export-cover { display: flex; align-items: center; justify-content: center; height: 100%; }
         .export-cover img { max-width: 100%; max-height: 100%; }
         img { max-width: 100%; }
+        h1, h2, h3, h4, h5, h6 { break-after: avoid-page; page-break-after: avoid; }
+        p { orphans: 3; }
         table { border-collapse: collapse; width: 100%; }
+        thead { display: table-header-group; }
+        tr { break-inside: avoid; page-break-inside: avoid; }
         th, td { border: 1px solid #ccc; padding: 6px 10px; }
         pre { background: #f4f4f4; padding: 10px; overflow-x: auto; }
         code { font-family: "Cascadia Code", "Fira Code", Consolas, monospace; }
