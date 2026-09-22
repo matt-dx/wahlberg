@@ -35,6 +35,15 @@ internal static class PdfExporter
     {
         await using var hidden = await HiddenWebView.CreateAsync();
 
+        // Resize to the print content width (page width minus left/right margins) before
+        // navigating, so the DOM lays out — and ApplyPageBreakAdjustmentsAsync later measures —
+        // at the same width PrintToPdfAsync will actually print at, not HiddenWebView's wider
+        // generic on-screen default. Narrower print wrapping can make a table/paragraph taller
+        // than it would measure at the default width, which is exactly the size that
+        // break-inside:avoid decision needs to get right.
+        var printContentWidthPx = (int)Math.Round((PageWidthIn - 2 * MarginIn) * 96);
+        hidden.Resize(printContentWidthPx, HiddenWebView.DefaultHeight);
+
         var tempHtmlPath = Path.Combine(FileSystem.CacheDirectory, $"{Guid.NewGuid()}.html");
         await File.WriteAllTextAsync(tempHtmlPath, html);
         try

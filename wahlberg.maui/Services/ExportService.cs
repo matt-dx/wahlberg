@@ -36,7 +36,7 @@ public partial class ExportService
         // render time. Pdf/Epub output is static HTML with no script execution, so without this
         // step those blocks would show up as literal mermaid source text instead of a diagram —
         // same rendering approach as ExportEmbeddedMarkdownAsync, so Windows-only.
-        var mermaidSvgs = new Queue<string>();
+        var mermaidSvgs = new List<string>();
 #if WINDOWS
         var mermaidSources = Markdig.Parsers.MarkdownParser.Parse(body, _pipeline)
             .Descendants<FencedCodeBlock>()
@@ -45,8 +45,17 @@ public partial class ExportService
             .ToList();
         if (mermaidSources.Count > 0)
         {
-            foreach (var svg in await Platforms.Windows.MermaidRenderer.RenderAllAsync(mermaidSources))
-                mermaidSvgs.Enqueue(svg);
+            try
+            {
+                mermaidSvgs = await Platforms.Windows.MermaidRenderer.RenderAllAsync(mermaidSources);
+            }
+            catch
+            {
+                // A renderer-wide failure (hidden WebView2 setup/navigation/script errors)
+                // shouldn't abort the whole Pdf/Epub export — leave mermaidSvgs empty so
+                // ReplaceMermaidBlocks falls back to the raw mermaid source for every block.
+                mermaidSvgs = [];
+            }
         }
 #endif
 
@@ -76,6 +85,7 @@ public partial class ExportService
     public List<ExportSection> SplitContent(string markdown, MarkdownPipeline pipeline, bool splitOnHr, int? splitHeadingLevel)
     {
         var document = Markdig.Parsers.MarkdownParser.Parse(markdown, pipeline);
+        TagMermaidBlocks(document);
         var sections = new List<ExportSection>();
         var current = new List<Block>();
         HeadingInfo? currentHeading = null;
@@ -334,20 +344,41 @@ public partial class ExportService
     private static string SelfCloseVoidElements(string html) =>
         VoidElementRegex().Replace(html, m => $"<{m.Groups[1].Value}{m.Groups[2].Value} />");
 
-    [GeneratedRegex(@"<pre class=""mermaid"">.*?</pre>", RegexOptions.Singleline)]
+    // Tags each fenced mermaid block with a stable sequential index, in the same document-order
+    // traversal (and using the same "Info == mermaid" filter) as the source extraction in
+    // ExportAsync, so the Nth mermaid block found here is always the Nth source that was sent to
+    // MermaidRenderer. The index rides along as a data attribute on the rendered
+    // <pre class="mermaid" data-mermaid-idx="N"> tag; ReplaceMermaidBlocks keys off it instead of
+    // blindly matching any "<pre class=\"mermaid\">" text, so raw HTML in the document that
+    // merely looks like a mermaid block (never tagged, since it isn't a FencedCodeBlock) can't
+    // consume another block's SVG and shift every replacement after it out of alignment.
+    private static void TagMermaidBlocks(Markdig.Syntax.MarkdownDocument document)
+    {
+        var idx = 0;
+        foreach (var block in document.Descendants<FencedCodeBlock>())
+        {
+            if (!string.Equals(block.Info, "mermaid", StringComparison.OrdinalIgnoreCase)) continue;
+            block.GetAttributes().AddPropertyIfNotExist("data-mermaid-idx", (idx++).ToString());
+        }
+    }
+
+    [GeneratedRegex(@"<pre class=""mermaid"" data-mermaid-idx=""(\d+)"">.*?</pre>", RegexOptions.Singleline)]
     private static partial Regex MermaidBlockRegex();
 
-    // Replaces each rendered mermaid <pre> block, in document order, with the corresponding
-    // pre-rendered SVG (dequeued in the same order MermaidRenderer received the sources). A
-    // block whose render failed (empty string) or that has no queued SVG (non-Windows, where
-    // the queue is always empty) is left as-is, so the raw mermaid source stays visible rather
-    // than disappearing silently.
-    private static string ReplaceMermaidBlocks(string html, Queue<string> svgs)
+    // Replaces each tagged mermaid <pre> block with its pre-rendered SVG, looked up by the
+    // data-mermaid-idx TagMermaidBlocks assigned it (not by match order — see that method for
+    // why). A missing/out-of-range index or an empty SVG (failed render) leaves the original
+    // text in place rather than disappearing silently.
+    private static string ReplaceMermaidBlocks(string html, List<string> svgs)
     {
         if (svgs.Count == 0) return html;
 
         return MermaidBlockRegex().Replace(html, m =>
-            svgs.TryDequeue(out var svg) && !string.IsNullOrEmpty(svg) ? WrapMermaidSvg(svg) : m.Value);
+        {
+            if (!int.TryParse(m.Groups[1].Value, out var idx) || idx < 0 || idx >= svgs.Count) return m.Value;
+            var svg = svgs[idx];
+            return string.IsNullOrEmpty(svg) ? m.Value : WrapMermaidSvg(svg);
+        });
     }
 
     // Wraps a rendered mermaid SVG in a bordered/padded card (matching the export CSS's light,
