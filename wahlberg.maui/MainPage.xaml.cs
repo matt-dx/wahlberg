@@ -6,6 +6,10 @@ public partial class MainPage : ContentPage
 {
     private static readonly string[] MarkdownExtensions = [".md", ".markdown", ".mdown", ".mkd", ".mkdn"];
 
+#if WINDOWS
+    private Microsoft.Web.WebView2.Core.CoreWebView2? _coreWebView;
+#endif
+
     public MainPage()
     {
         InitializeComponent();
@@ -14,6 +18,7 @@ public partial class MainPage : ContentPage
         {
 #if WINDOWS
             var webview = args.WebView.CoreWebView2;
+            _coreWebView = webview;
 
             // Enable the default browser context menu (right-click copy, etc.)
             webview.Settings.AreDefaultContextMenusEnabled = true;
@@ -40,6 +45,7 @@ public partial class MainPage : ContentPage
 
     private async void OnDrop(object? sender, DropEventArgs e)
     {
+        ClearDragOverlay();
         try
         {
             await HandleDropAsync(e);
@@ -48,6 +54,24 @@ public partial class MainPage : ContentPage
         {
             System.Diagnostics.Debug.WriteLine($"Drop error: {ex.Message}");
         }
+    }
+
+    private void OnDragLeave(object? sender, DragEventArgs e) => ClearDragOverlay();
+
+    // The native drop gesture consumes the drop before WebView2 sees it, so app.js's own
+    // 'drop'/'dragleave' handlers never fire to remove the overlay it added on dragover.
+    private void ClearDragOverlay()
+    {
+#if WINDOWS
+        try
+        {
+            _coreWebView?.ExecuteScriptAsync("document.body.classList.remove('drag-over')");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Clear drag overlay error: {ex.Message}");
+        }
+#endif
     }
 
     private async Task HandleDropAsync(DropEventArgs e)
