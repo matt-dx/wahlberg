@@ -668,7 +668,17 @@ public partial class TabService : IDisposable
             {
                 var absolutePath = Path.GetFullPath(Path.Combine(documentDirectory, src));
                 if (!File.Exists(absolutePath))
-                    return match.Value;
+                {
+                    // Markdown image paths are URLs, so spaces etc. are usually percent-encoded
+                    // (e.g. "my%20shots/a.png"); Markdig leaves them as written.
+                    var decoded = src;
+                    var cut = decoded.IndexOfAny(['?', '#']);
+                    if (cut >= 0) decoded = decoded[..cut];
+                    decoded = Uri.UnescapeDataString(decoded);
+                    absolutePath = Path.GetFullPath(Path.Combine(documentDirectory, decoded));
+                    if (!File.Exists(absolutePath))
+                        return match.Value;
+                }
 
                 var url = ToLocalFileUrl(absolutePath);
                 return $"{prefix}{url}{suffix}";

@@ -10,7 +10,7 @@
             <RootComponent Selector="#app" ComponentType="{x:Type components:Routes}" />
         </BlazorWebView.RootComponents>
         <BlazorWebView.GestureRecognizers>
-            <DropGestureRecognizer AllowDrop="True" Drop="OnDrop" DragOver="OnDragOver" />
+            <DropGestureRecognizer AllowDrop="True" Drop="OnDrop" DragOver="OnDragOver" DragLeave="OnDragLeave" />
         </BlazorWebView.GestureRecognizers>
     </BlazorWebView>
 
