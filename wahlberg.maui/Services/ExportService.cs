@@ -197,11 +197,11 @@ public partial class ExportService
                 continue;
             }
 
-            if (!TryResolveExistingImage(docDir, url, out var absolutePath)) continue;
+            if (!TryResolveExistingImage(docDir, url, out var absolutePath, out var urlSuffix)) continue;
 
             var bytes = await File.ReadAllBytesAsync(absolutePath);
             var mime = MimeTypeFor(Path.GetExtension(absolutePath));
-            var dataUri = $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
+            var dataUri = $"data:{mime};base64,{Convert.ToBase64String(bytes)}{urlSuffix}";
 
             var span = link.Span;
             var original = markdown.Substring(span.Start, span.End - span.Start + 1);
@@ -295,11 +295,11 @@ public partial class ExportService
 
             try
             {
-                if (!TryResolveExistingImage(documentDirectory, src, out var absolutePath)) return match.Value;
+                if (!TryResolveExistingImage(documentDirectory, src, out var absolutePath, out var urlSuffix)) return match.Value;
 
                 var bytes = File.ReadAllBytes(absolutePath);
                 var mime = MimeTypeFor(Path.GetExtension(absolutePath));
-                return $"{prefix}data:{mime};base64,{Convert.ToBase64String(bytes)}{suffix}";
+                return $"{prefix}data:{mime};base64,{Convert.ToBase64String(bytes)}{urlSuffix}{suffix}";
             }
             catch
             {
@@ -323,14 +323,21 @@ public partial class ExportService
     // contain spaces etc. (e.g. "my%20shots/a.png"), which never matches the real file name, so the
     // literal path is tried first and then the query/fragment-stripped, unescaped form (same
     // fallback as TabService.ResolveLocalPaths for the live viewer).
-    private static bool TryResolveExistingImage(string baseDirectory, string url, out string absolutePath)
+    private static bool TryResolveExistingImage(string baseDirectory, string url, out string absolutePath, out string urlSuffix)
     {
+        urlSuffix = "";
         if (TryResolveWithinDirectory(baseDirectory, url, out absolutePath) && File.Exists(absolutePath))
             return true;
 
+        // The stripped query/fragment (e.g. an SVG "#svgView(...)") is returned so callers can
+        // keep it on the data URI; literal-path matches above never have one.
         var decoded = url;
         var cut = decoded.IndexOfAny(['?', '#']);
-        if (cut >= 0) decoded = decoded[..cut];
+        if (cut >= 0)
+        {
+            urlSuffix = decoded[cut..];
+            decoded = decoded[..cut];
+        }
         decoded = Uri.UnescapeDataString(decoded);
         return TryResolveWithinDirectory(baseDirectory, decoded, out absolutePath) && File.Exists(absolutePath);
     }
