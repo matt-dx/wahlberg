@@ -197,8 +197,7 @@ public partial class ExportService
                 continue;
             }
 
-            if (!TryResolveWithinDirectory(docDir, url, out var absolutePath)) continue;
-            if (!File.Exists(absolutePath)) continue;
+            if (!TryResolveExistingImage(docDir, url, out var absolutePath)) continue;
 
             var bytes = await File.ReadAllBytesAsync(absolutePath);
             var mime = MimeTypeFor(Path.GetExtension(absolutePath));
@@ -296,8 +295,7 @@ public partial class ExportService
 
             try
             {
-                if (!TryResolveWithinDirectory(documentDirectory, src, out var absolutePath)) return match.Value;
-                if (!File.Exists(absolutePath)) return match.Value;
+                if (!TryResolveExistingImage(documentDirectory, src, out var absolutePath)) return match.Value;
 
                 var bytes = File.ReadAllBytes(absolutePath);
                 var mime = MimeTypeFor(Path.GetExtension(absolutePath));
@@ -320,6 +318,22 @@ public partial class ExportService
         ".bmp" => "image/bmp",
         _ => "application/octet-stream"
     };
+
+    // Finds the on-disk file for a Markdown/HTML image URL. Image URLs are percent-encoded when they
+    // contain spaces etc. (e.g. "my%20shots/a.png"), which never matches the real file name, so the
+    // literal path is tried first and then the query/fragment-stripped, unescaped form (same
+    // fallback as TabService.ResolveLocalPaths for the live viewer).
+    private static bool TryResolveExistingImage(string baseDirectory, string url, out string absolutePath)
+    {
+        if (TryResolveWithinDirectory(baseDirectory, url, out absolutePath) && File.Exists(absolutePath))
+            return true;
+
+        var decoded = url;
+        var cut = decoded.IndexOfAny(['?', '#']);
+        if (cut >= 0) decoded = decoded[..cut];
+        decoded = Uri.UnescapeDataString(decoded);
+        return TryResolveWithinDirectory(baseDirectory, decoded, out absolutePath) && File.Exists(absolutePath);
+    }
 
     // Resolves relativePath against baseDirectory and rejects anything that escapes it (e.g. via
     // "../"), so a document can't embed and re-share arbitrary files elsewhere on disk.
