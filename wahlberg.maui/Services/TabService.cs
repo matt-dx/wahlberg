@@ -667,13 +667,20 @@ public partial class TabService : IDisposable
             try
             {
                 var absolutePath = Path.GetFullPath(Path.Combine(documentDirectory, src));
+                var urlSuffix = "";
                 if (!File.Exists(absolutePath))
                 {
                     // Markdown image paths are URLs, so spaces etc. are usually percent-encoded
-                    // (e.g. "my%20shots/a.png"); Markdig leaves them as written.
+                    // (e.g. "my%20shots/a.png"); Markdig leaves them as written. The query/fragment
+                    // (e.g. an SVG "#svgView(...)") is not part of the file path but must be kept
+                    // on the rewritten URL.
                     var decoded = src;
                     var cut = decoded.IndexOfAny(['?', '#']);
-                    if (cut >= 0) decoded = decoded[..cut];
+                    if (cut >= 0)
+                    {
+                        urlSuffix = decoded[cut..];
+                        decoded = decoded[..cut];
+                    }
                     decoded = Uri.UnescapeDataString(decoded);
                     absolutePath = Path.GetFullPath(Path.Combine(documentDirectory, decoded));
                     if (!File.Exists(absolutePath))
@@ -681,7 +688,7 @@ public partial class TabService : IDisposable
                 }
 
                 var url = ToLocalFileUrl(absolutePath);
-                return $"{prefix}{url}{suffix}";
+                return $"{prefix}{url}{urlSuffix}{suffix}";
             }
             catch
             {
