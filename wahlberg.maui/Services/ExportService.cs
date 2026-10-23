@@ -329,13 +329,15 @@ public partial class ExportService
         if (TryResolveWithinDirectory(baseDirectory, url, out absolutePath) && File.Exists(absolutePath))
             return true;
 
-        // The stripped query/fragment (e.g. an SVG "#svgView(...)") is returned so callers can
+        // The stripped fragment (e.g. an SVG "#svgView(...)") is returned so callers can
         // keep it on the data URI; literal-path matches above never have one.
         var decoded = url;
         var cut = decoded.IndexOfAny(['?', '#']);
         if (cut >= 0)
         {
-            urlSuffix = decoded[cut..];
+            // A query would corrupt the base64 payload of a data URI, so only the fragment is kept.
+            var hash = decoded.IndexOf('#');
+            if (hash >= 0) urlSuffix = decoded[hash..];
             decoded = decoded[..cut];
         }
         decoded = Uri.UnescapeDataString(decoded);
